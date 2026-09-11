@@ -164,7 +164,7 @@ export async function PUT(request: NextRequest) {
     // sosTriggered is a latch: once raised it stays raised, so a later
     // status change cannot quietly retract an alert that was already sent.
     const raiseSos = sosTriggered === true;
-    const nextSos = checkin.sosTriggered || raiseSos ? 1 : 0;
+    const nextSos = Boolean(checkin.sosTriggered || raiseSos);
 
     await Database.query(
       'UPDATE safety_checkins SET status = ?, sosTriggered = ?, updatedAt = NOW() WHERE id = ?',
@@ -182,12 +182,12 @@ export async function PUT(request: NextRequest) {
       isNewSos ? 'TRIGGER_CHECKIN_SOS' : 'UPDATE_CHECKIN',
       'safety_checkins',
       id,
-      { status, sosTriggered: nextSos === 1 },
+      { status, sosTriggered: nextSos },
       request
     );
 
     return successResponse(
-      { id, status, sosTriggered: nextSos === 1 },
+      { id, status, sosTriggered: nextSos },
       isNewSos ? 'SOS alert raised and responders notified' : 'Safety check-in updated'
     );
   } catch (error) {

@@ -112,7 +112,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (search) {
-      query += ' AND (lf.title LIKE ? OR lf.description LIKE ? OR lf.location LIKE ?)';
+      query += ' AND (lf.title ILIKE ? OR lf.description ILIKE ? OR lf.location ILIKE ?)';
       // Escape LIKE wildcards so a search for "100%" is a literal search.
       const searchTerm = `%${search.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
       params.push(searchTerm, searchTerm, searchTerm);
@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
       `INSERT INTO lost_and_found
        (userId, type, title, description, category, location, dateReported, dateLostFound,
         imageUrl, contactInfo, isAnonymous, expiresAt)
-       VALUES (?, ?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, CURRENT_DATE, ?, ?, ?, ?, ?)`,
       [
         // Taken from the session, so a client cannot post as another user.
         auth.user.id,
@@ -176,7 +176,7 @@ export async function POST(request: NextRequest) {
         dateLostFound || null,
         imageUrl || null,
         JSON.stringify(contactInfo || {}),
-        isAnonymous ? 1 : 0,
+        Boolean(isAnonymous),
         expiresAt,
       ]
     );

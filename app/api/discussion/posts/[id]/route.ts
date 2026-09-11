@@ -113,7 +113,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       // `action`, so no request value can ever reach the SQL text.
       const counts = await Database.transaction(async (connection) => {
         const [existing] = (await connection.execute(
-          'SELECT voteType FROM discussion_votes WHERE userId = ? AND targetType = "post" AND targetId = ?',
+          "SELECT voteType FROM discussion_votes WHERE userId = ? AND targetType = 'post' AND targetId = ?",
           [user.id, postId]
         )) as any;
 
@@ -122,7 +122,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         if (previous === action) {
           // Same vote again withdraws it.
           await connection.execute(
-            'DELETE FROM discussion_votes WHERE userId = ? AND targetType = "post" AND targetId = ?',
+            "DELETE FROM discussion_votes WHERE userId = ? AND targetType = 'post' AND targetId = ?",
             [user.id, postId]
           );
 
@@ -137,7 +137,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         } else if (previous) {
           // Switching sides moves one count up and the other down.
           await connection.execute(
-            'UPDATE discussion_votes SET voteType = ? WHERE userId = ? AND targetType = "post" AND targetId = ?',
+            "UPDATE discussion_votes SET voteType = ? WHERE userId = ? AND targetType = 'post' AND targetId = ?",
             [action, user.id, postId]
           );
 
@@ -149,7 +149,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
           );
         } else {
           await connection.execute(
-            'INSERT INTO discussion_votes (userId, targetType, targetId, voteType) VALUES (?, "post", ?, ?)',
+            "INSERT INTO discussion_votes (userId, targetType, targetId, voteType) VALUES (?, 'post', ?, ?)",
             [user.id, postId, action]
           );
 

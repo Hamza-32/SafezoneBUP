@@ -13,25 +13,25 @@ export async function GET(request: NextRequest) {
   return withAdmin(request, async (req: NextRequest, user: any) => {
     try {
       // Get overall statistics
-      const [totalUsers] = await Database.query('SELECT COUNT(*) as count FROM users WHERE role = "student"');
-      const [totalAdmins] = await Database.query('SELECT COUNT(*) as count FROM users WHERE role = "admin"');
+      const [totalUsers] = await Database.query("SELECT COUNT(*) as count FROM users WHERE role = 'student'");
+      const [totalAdmins] = await Database.query("SELECT COUNT(*) as count FROM users WHERE role = 'admin'");
       const [totalEmergencyReports] = await Database.query('SELECT COUNT(*) as count FROM emergency_reports');
       const [totalComplaints] = await Database.query('SELECT COUNT(*) as count FROM complaints');
       
       // Get pending items
-      const [pendingEmergencies] = await Database.query('SELECT COUNT(*) as count FROM emergency_reports WHERE status = "pending"');
-      const [pendingComplaints] = await Database.query('SELECT COUNT(*) as count FROM complaints WHERE status = "pending"');
-      const [criticalEmergencies] = await Database.query('SELECT COUNT(*) as count FROM emergency_reports WHERE priority = "critical" AND status != "resolved"');
+      const [pendingEmergencies] = await Database.query("SELECT COUNT(*) as count FROM emergency_reports WHERE status = 'pending'");
+      const [pendingComplaints] = await Database.query("SELECT COUNT(*) as count FROM complaints WHERE status = 'pending'");
+      const [criticalEmergencies] = await Database.query("SELECT COUNT(*) as count FROM emergency_reports WHERE priority = 'critical' AND status <> 'resolved'");
 
       // Get recent activity (last 24 hours)
       const [recentEmergencies] = await Database.query(
         `SELECT COUNT(*) as count FROM emergency_reports 
-         WHERE createdAt >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`
+         WHERE createdAt >= NOW() - INTERVAL '24 hours'`
       );
 
       const [recentComplaints] = await Database.query(
         `SELECT COUNT(*) as count FROM complaints 
-         WHERE createdAt >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`
+         WHERE createdAt >= NOW() - INTERVAL '24 hours'`
       );
 
       // Get recent reports for quick access
@@ -57,30 +57,31 @@ export async function GET(request: NextRequest) {
          LIMIT 5`
       );
 
-      // Get monthly trends (last 6 months)
+      // Get monthly trends (last 6 months). TO_CHAR is the PostgreSQL
+      // equivalent of MySQL's DATE_FORMAT.
       const monthlyEmergencies = await Database.query(`
-        SELECT 
-          DATE_FORMAT(createdAt, '%Y-%m') as month,
+        SELECT
+          TO_CHAR(createdAt, 'YYYY-MM') as month,
           COUNT(*) as count
         FROM emergency_reports
-        WHERE createdAt >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-        GROUP BY DATE_FORMAT(createdAt, '%Y-%m')
+        WHERE createdAt >= NOW() - INTERVAL '6 months'
+        GROUP BY TO_CHAR(createdAt, 'YYYY-MM')
         ORDER BY month DESC
       `);
 
       const monthlyComplaints = await Database.query(`
-        SELECT 
-          DATE_FORMAT(createdAt, '%Y-%m') as month,
+        SELECT
+          TO_CHAR(createdAt, 'YYYY-MM') as month,
           COUNT(*) as count
         FROM complaints
-        WHERE createdAt >= DATE_SUB(NOW(), INTERVAL 6 MONTH)
-        GROUP BY DATE_FORMAT(createdAt, '%Y-%m')
+        WHERE createdAt >= NOW() - INTERVAL '6 months'
+        GROUP BY TO_CHAR(createdAt, 'YYYY-MM')
         ORDER BY month DESC
       `);
 
       // Get verification requests
       const [pendingVerifications] = await Database.query(
-        'SELECT COUNT(*) as count FROM users WHERE isVerified = FALSE AND role = "student"'
+        "SELECT COUNT(*) as count FROM users WHERE isVerified = FALSE AND role = 'student'"
       );
 
       // Process latest reports

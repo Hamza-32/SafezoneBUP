@@ -588,9 +588,11 @@ export const clearData = async () => {
       'users'
     ];
 
+    // TRUNCATE with RESTART IDENTITY is the PostgreSQL equivalent of
+    // deleting the rows and resetting AUTO_INCREMENT. CASCADE lets it
+    // clear tables that others reference, which DELETE would refuse.
     for (const table of tables) {
-      await Database.query(`DELETE FROM ${table}`);
-      await Database.query(`ALTER TABLE ${table} AUTO_INCREMENT = 1`);
+      await Database.query(`TRUNCATE TABLE ${table} RESTART IDENTITY CASCADE`);
     }
 
     console.log('✅ All data cleared successfully!');

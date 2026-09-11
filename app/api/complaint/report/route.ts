@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
         category,
         location || null,
         finalPriority,
-        isAnonymous ? 1 : 0,
+        Boolean(isAnonymous),
         attachments ? JSON.stringify(attachments) : null,
       ]
     );

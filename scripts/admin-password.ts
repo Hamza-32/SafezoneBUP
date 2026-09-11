@@ -24,7 +24,7 @@ dotenv.config({ path: '.env.local', quiet: true });
 
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import { Database } from '../lib/database';
+import { Database, describeConnection } from '../lib/database';
 import { passwordSchema } from '../lib/validation';
 
 const BCRYPT_ROUNDS = 12;
@@ -49,9 +49,7 @@ function parseArgs(argv: string[]): Record<string, string | boolean> {
 }
 
 function printTarget(): void {
-  const host = process.env.DB_HOST || 'localhost';
-  const database = process.env.DB_NAME || 'safezone_db';
-  console.log(`Target: ${database} on ${host}\n`);
+  console.log(`Target: ${describeConnection()}\n`);
 }
 
 /** Generates a password that satisfies the policy. */
@@ -68,7 +66,8 @@ async function audit(): Promise<number> {
   printTarget();
 
   const users = await Database.query(
-    "SELECT id, email, role, password FROM users ORDER BY FIELD(role, 'admin', 'security', 'student'), id"
+    `SELECT id, email, role, password FROM users
+     ORDER BY CASE role WHEN 'admin' THEN 0 WHEN 'security' THEN 1 ELSE 2 END, id`
   );
 
   if (users.length === 0) {

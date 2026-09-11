@@ -25,7 +25,7 @@ export async function POST(
 
       // Verify post exists
       const [post] = await Database.query(
-        'SELECT id FROM discussion_posts WHERE id = ? AND status = "approved"',
+        "SELECT id FROM discussion_posts WHERE id = ? AND status = 'approved'",
         [postId]
       );
 

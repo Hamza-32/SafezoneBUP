@@ -16,8 +16,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# env files
+# env files. .env* is deliberately broad, with an exception for the
+# template so contributors still get it.
 .env*
+!.env.example
 
 # vercel
 .vercel

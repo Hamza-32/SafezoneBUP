@@ -102,9 +102,12 @@ export async function POST(request: NextRequest) {
       }
 
       if (points) {
+        // The excluded row is the one this statement tried to insert, so the
+        // existing total has to be qualified with the table name.
         await connection.execute(
           `INSERT INTO user_points (userId, points) VALUES (?, ?)
-           ON DUPLICATE KEY UPDATE points = points + ?`,
+           ON CONFLICT (userId)
+           DO UPDATE SET points = user_points.points + ?, lastUpdated = NOW()`,
           [userId, points, points]
         );
       }

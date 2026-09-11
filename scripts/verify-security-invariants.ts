@@ -26,14 +26,14 @@ import { rateLimit, resetRateLimits } from '../lib/rate-limit';
 let failures = 0;
 let checks = 0;
 
-function check(description: string, condition: boolean): void {
+function check(description: string, condition: boolean, detail?: string): void {
   checks += 1;
 
   if (condition) {
     console.log(`  ok    ${description}`);
   } else {
     failures += 1;
-    console.error(`  FAIL  ${description}`);
+    console.error(`  FAIL  ${description}${detail ? ` — ${detail}` : ''}`);
   }
 }
 
@@ -208,6 +208,121 @@ section('Rate limiter');
 }
 
 // ---------------------------------------------------------------------------
+// Column name casing.
+//
+// PostgreSQL lower-cases unquoted identifiers, so the data layer maps
+// returned keys back to the casing the application reads. A camelCase column
+// or alias that is missing from that map arrives lower-cased and every read
+// of it is undefined, with no error. This check makes that impossible to
+// miss by scanning the schema and the SELECT aliases for names the map does
+// not cover.
+// ---------------------------------------------------------------------------
+
+async function checkColumnCaseMap(): Promise<void> {
+  const fs = await import('node:fs/promises');
+  const path = await import('node:path');
+  const { COLUMN_CASE_MAP } = await import('../lib/database-columns');
+
+  section('Column name casing is fully mapped');
+
+  const root = path.resolve(__dirname, '..');
+  const sources = [
+    'lib/database-setup.ts',
+    'lib/database-migrate.ts',
+    ...(await collectRouteFiles(fs, path, path.join(root, 'app/api'))),
+  ];
+
+  const missing = new Set<string>();
+
+  for (const relative of sources) {
+    const file = path.isAbsolute(relative) ? relative : path.join(root, relative);
+    const text = await fs.readFile(file, 'utf8');
+
+    // Column definitions in the schema: a camelCase name at the start of a
+    // line followed by a type.
+    for (const match of text.matchAll(
+      /^\s{2,}([a-z]+[A-Z]\w*)\s+(?:SERIAL|INTEGER|INT\b|TEXT|VARCHAR|BOOLEAN|TIMESTAMPTZ|TIMESTAMP|DATE|JSONB|NUMERIC)/gm
+    )) {
+      if (COLUMN_CASE_MAP[match[1].toLowerCase()] === undefined) missing.add(match[1]);
+    }
+
+    // Aliases introduced by a SELECT, which come back lower-cased too.
+    for (const match of text.matchAll(/\bas\s+([a-z]+[A-Z]\w*)\b/g)) {
+      if (COLUMN_CASE_MAP[match[1].toLowerCase()] === undefined) missing.add(match[1]);
+    }
+  }
+
+  check(
+    'every camelCase column and alias is in the casing map',
+    missing.size === 0,
+    missing.size > 0 ? `missing: ${[...missing].sort().join(', ')}` : undefined
+  );
+}
+
+async function collectRouteFiles(fs: any, path: any, dir: string): Promise<string[]> {
+  const found: string[] = [];
+
+  for (const entry of await fs.readdir(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+
+    if (entry.isDirectory()) {
+      found.push(...(await collectRouteFiles(fs, path, full)));
+    } else if (entry.name === 'route.ts') {
+      found.push(full);
+    }
+  }
+
+  return found;
+}
+
+// ---------------------------------------------------------------------------
+// Placeholder translation. Every statement in the project is written with
+// MySQL's `?` and translated to PostgreSQL's `$n` in the data layer, so a
+// mistake here would corrupt every query in the application.
+// ---------------------------------------------------------------------------
+
+async function checkPlaceholderTranslation(): Promise<void> {
+  const { toPositionalParams } = await import('../lib/database');
+
+  section('Placeholder translation');
+
+  check(
+    'numbers placeholders in order',
+    toPositionalParams('INSERT INTO t (a, b, c) VALUES (?, ?, ?)') ===
+      'INSERT INTO t (a, b, c) VALUES ($1, $2, $3)'
+  );
+
+  check(
+    'leaves a question mark inside a string literal alone',
+    toPositionalParams("SELECT * FROM t WHERE label = 'why?' AND id = ?") ===
+      "SELECT * FROM t WHERE label = 'why?' AND id = $1"
+  );
+
+  check(
+    'handles an escaped quote inside a literal',
+    toPositionalParams("SELECT * FROM t WHERE name = 'it''s ok?' AND id = ?") ===
+      "SELECT * FROM t WHERE name = 'it''s ok?' AND id = $1"
+  );
+
+  check(
+    'leaves a question mark in a line comment alone',
+    toPositionalParams('SELECT 1 -- really?\nWHERE id = ?') ===
+      'SELECT 1 -- really?\nWHERE id = $2'.replace('$2', '$1')
+  );
+
+  check(
+    'leaves a dollar-quoted body alone',
+    toPositionalParams("CREATE FUNCTION f() AS $$ BEGIN RETURN 'a?'; END; $$ LANGUAGE plpgsql") ===
+      "CREATE FUNCTION f() AS $$ BEGIN RETURN 'a?'; END; $$ LANGUAGE plpgsql"
+  );
+
+  check(
+    'does not renumber an already-translated statement',
+    toPositionalParams('SELECT * FROM t WHERE id = $1') === 'SELECT * FROM t WHERE id = $1'
+  );
+}
+
+// ---------------------------------------------------------------------------
 // The shared rate-limit backend, exercised against a stub of the Redis REST
 // protocol. This is the riskiest new code path, because it sits in front of
 // login and has to fail open to the in-memory counters rather than reject.
@@ -310,10 +425,12 @@ async function checkSharedRateLimiter(): Promise<void> {
 
 // ---------------------------------------------------------------------------
 
-checkSharedRateLimiter()
+checkColumnCaseMap()
+  .then(checkPlaceholderTranslation)
+  .then(checkSharedRateLimiter)
   .catch((error) => {
     failures += 1;
-    console.error(`  FAIL  shared rate-limit checks threw: ${error?.message ?? error}`);
+    console.error(`  FAIL  asynchronous checks threw: ${error?.message ?? error}`);
   })
   .then(() => {
     console.log('');

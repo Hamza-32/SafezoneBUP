@@ -16,7 +16,12 @@ by Next.js itself. There is no separate backend process to start.
 
 - Node.js 18 or newer
 - npm
-- A MySQL 8 database
+- A PostgreSQL database. A free Supabase project is the intended setup, and
+  works for local development too, so nothing needs installing.
+
+> This app ran on MySQL until the move to PostgreSQL. If you find older
+> instructions mentioning `mysql2`, `DB_NAME=safezone_db` or MySQL-style
+> schema files, they predate that change.
 
 ## Local setup
 
@@ -27,18 +32,20 @@ Copy-Item .env.example .env.local
 
 Then edit `.env.local`:
 
-- Fill in the `DB_*` values for your MySQL instance.
-- Set `JWT_SECRET`. Generate one with:
-
-```powershell
-node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
-```
+- Set `DATABASE_URL` to your Supabase **connection pooler** string, found
+  under Project Settings, Database, Connection string. Use the pooler rather
+  than the direct connection: it is what lets many short-lived serverless
+  functions share a small number of real connections. URL-encode the password
+  if it contains any of `@ : / ? # %`.
+- Set `JWT_SECRET`. Generate one with `npm run gen:secret`.
 
 Create the schema and sample data:
 
 ```powershell
 npm run db:init
 ```
+
+The seed prints a generated administrator password once. Save it.
 
 Start the dev server:
 
@@ -59,11 +66,15 @@ npm run dev
 | `npm run db:seed`           | Insert sample data                                |
 | `npm run db:reset`          | Drop and recreate every table (destroys all data) |
 
-`db:migrate` matters for any database created before the migration runner
-existed. It fixes three things that were broken in the original schema:
-anonymous reports could not be stored, report reference codes were not saved,
-and several categories offered by the report forms were rejected by the
-database.
+A database created by `db:setup` is already current, so `db:migrate` reports
+nothing to do. It exists for one created by an earlier revision of the schema,
+and for every future change: `lib/database-setup.ts` only defines what a new
+database gets, and `CREATE TABLE IF NOT EXISTS` will never alter an existing
+one. Add a migration for anything that has to change after the first deploy.
+
+Enumerated columns are TEXT with a CHECK constraint rather than a native
+PostgreSQL enum type, because a CHECK constraint can be widened by an ordinary
+migration. `setAllowedValues` in `lib/database-migrate.ts` does that.
 
 ## First administrator
 
@@ -120,36 +131,36 @@ tokens yet.
 
 ## Deploying to Vercel
 
-1. Push the repository to GitHub and import it in Vercel. The framework is
-   detected automatically; no build configuration is needed.
+1. Create a Supabase project. Copy the **connection pooler** string from
+   Project Settings, Database, Connection string. The direct connection will
+   exhaust its connection limit once several functions run at once.
 
-2. Provision a MySQL database that is reachable from Vercel. A local or
-   campus-network MySQL will not be reachable from Vercel's functions.
+2. Push the repository to GitHub and import it in Vercel. The framework is
+   detected automatically; no build configuration is needed.
 
 3. Set these environment variables in Project Settings, for Production and
    Preview both.
 
    Required:
 
-   | Variable              | Value                                            |
-   | --------------------- | ------------------------------------------------ |
-   | `JWT_SECRET`          | Output of `npm run gen:secret`, 32+ characters   |
-   | `DB_HOST`             | Database hostname                                |
-   | `DB_USER`             | Database user                                    |
-   | `DB_PASSWORD`         | Database password                                |
-   | `DB_NAME`             | Database name                                    |
-   | `DB_PORT`             | Usually `3306`                                   |
-   | `DB_CONNECTION_LIMIT` | `2`                                              |
+   | Variable              | Value                                          |
+   | --------------------- | ---------------------------------------------- |
+   | `DATABASE_URL`        | The Supabase pooler connection string          |
+   | `JWT_SECRET`          | Output of `npm run gen:secret`, 32+ characters |
+   | `DB_CONNECTION_LIMIT` | `2`                                            |
 
    Strongly recommended, so rate limits are shared between instances:
 
-   | Variable            | Value                                    |
-   | ------------------- | ---------------------------------------- |
-   | `KV_REST_API_URL`   | From a Vercel KV or Upstash Redis store  |
-   | `KV_REST_API_TOKEN` | From the same store                      |
+   | Variable            | Value                                   |
+   | ------------------- | --------------------------------------- |
+   | `KV_REST_API_URL`   | From a Vercel KV or Upstash Redis store |
+   | `KV_REST_API_TOKEN` | From the same store                     |
 
    Linking a Vercel KV store to the project sets that pair for you. Outside
    Vercel, use `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
+
+   TLS is enabled automatically for any non-local host, so no SSL variable is
+   needed for Supabase.
 
    The app refuses to run in production without `JWT_SECRET` rather than
    falling back to a value committed in the repository. Changing the secret
@@ -158,15 +169,16 @@ tokens yet.
    If you prefer the CLI, `npm i -g vercel`, then `vercel login`, then:
 
    ```powershell
+   vercel env add DATABASE_URL production
    vercel env add JWT_SECRET production
-   vercel env add DB_HOST production
    # ...one per variable, for production and preview
    ```
 
-4. Apply the schema to the production database from your own machine, by
-   pointing the `DB_*` variables in `.env.local` at it and running:
+4. Create the schema in the Supabase database from your own machine, by
+   putting the same `DATABASE_URL` in `.env.local` and running:
 
    ```powershell
+   npm run db:setup
    npm run db:migrate -- --yes
    ```
 
@@ -175,22 +187,40 @@ tokens yet.
    migrate the wrong database. The in-app setup endpoint now requires an
    administrator session, so first-time bootstrap happens from the CLI.
 
-5. Rotate any account that still uses a password from the seed data, which is
+5. Seed the administrator account, then confirm nothing is using a password
    published in this repository:
 
    ```powershell
+   npm run db:seed
    npm run admin:audit
+   ```
+
+   `db:seed` prints a generated administrator password once. If you seeded
+   earlier with the old fixed password, rotate it:
+
+   ```powershell
    npm run admin:password -- --email=admin@bup.edu.bd --generate
    ```
 
-   Do this before the database is reachable from the internet.
+   Do this before the app is reachable from the internet.
+
+6. Confirm the deployment end to end:
+
+   ```powershell
+   npm run verify:api -- --url=https://your-app.vercel.app --yes
+   ```
+
+   It creates two throwaway accounts, checks privilege escalation,
+   cross-user access, the SOS latch and anonymous reporting, then deletes
+   what it made.
 
 ### Two things to know about serverless
 
-**Connection limits.** Each concurrent function instance opens its own MySQL
-pool. Keep `DB_CONNECTION_LIMIT` low and make sure it multiplied by your
-expected concurrency stays below the database's `max_connections`. If you see
-intermittent errors under load, this is the first thing to check.
+**Connection limits.** Each concurrent function instance opens its own pool.
+Connect through the Supabase pooler, keep `DB_CONNECTION_LIMIT` low, and make
+sure it multiplied by your expected concurrency stays below the pooler's
+client limit. If you see intermittent errors under load, this is the first
+thing to check.
 
 **Rate limiting depends on the KV variables.** With them set, counters live in
 Redis and are shared across instances. Without them, the limits fall back to

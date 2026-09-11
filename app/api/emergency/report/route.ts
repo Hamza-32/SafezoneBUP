@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
         latitude ?? null,
         longitude ?? null,
         finalPriority,
-        isAnonymous ? 1 : 0,
+        Boolean(isAnonymous),
         attachments ? JSON.stringify(attachments) : null,
       ]
     );
