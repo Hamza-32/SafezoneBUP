@@ -1,8 +1,11 @@
+export const dynamic = 'force-dynamic';
+
 // Admin Moderation API - GET /api/admin/moderation
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';
-import { 
+import {
   withAdmin,
+  logAction,
   successResponse,
   errorResponse
 } from '@/lib/api-middleware';
@@ -102,13 +105,43 @@ export async function POST(request: NextRequest) {
         return errorResponse('Invalid content type', 400);
       }
 
-      const table = type === 'post' ? 'discussion_posts' : 'discussion_comments';
-      const status = action === 'approve' ? 'approved' : 
-                     action === 'reject' ? 'rejected' : 'flagged';
+      const targetId = Number(id);
 
-      await Database.query(
-        `UPDATE ${table} SET status = ?, moderatedBy = ?, moderatedAt = NOW(), moderationNote = ? WHERE id = ?`,
-        [status, user.id, moderationNote || null, id]
+      if (!Number.isInteger(targetId) || targetId <= 0) {
+        return errorResponse('Invalid content id', 400);
+      }
+
+      if (moderationNote !== undefined && typeof moderationNote !== 'string') {
+        return errorResponse('moderationNote must be text', 400);
+      }
+
+      const status =
+        action === 'approve' ? 'approved' : action === 'reject' ? 'rejected' : 'flagged';
+
+      // Both statements are written out in full so no part of the request
+      // ever reaches the SQL text, not even through an allowlist.
+      const result = await Database.query(
+        type === 'post'
+          ? `UPDATE discussion_posts
+             SET status = ?, moderatedBy = ?, moderatedAt = NOW(), moderationNote = ?
+             WHERE id = ?`
+          : `UPDATE discussion_comments
+             SET status = ?, moderatedBy = ?, moderatedAt = NOW(), moderationNote = ?
+             WHERE id = ?`,
+        [status, user.id, (moderationNote as string) || null, targetId]
+      );
+
+      if (result.affectedRows === 0) {
+        return errorResponse('Content not found', 404);
+      }
+
+      await logAction(
+        user.id,
+        'MODERATE_CONTENT',
+        type === 'post' ? 'discussion_posts' : 'discussion_comments',
+        targetId,
+        { action, status },
+        request
       );
 
       return successResponse({

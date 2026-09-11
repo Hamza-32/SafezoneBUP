@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // Discussion Post Details API - GET /api/discussion/posts/[id]
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';
@@ -80,81 +82,103 @@ export async function GET(
 }
 
 // Vote on a post
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+// Vote on a post. Sending the same action twice withdraws the vote.
+export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
   return withAuth(request, async (req: NextRequest, user: any) => {
     try {
-      const postId = params.id;
-      const body = await request.json();
-      const { action } = body; // 'upvote' or 'downvote'
+      const postId = Number(params.id);
 
-      if (!['upvote', 'downvote'].includes(action)) {
+      if (!Number.isInteger(postId) || postId <= 0) {
+        return errorResponse('Invalid post id', 400);
+      }
+
+      const body = await request.json().catch(() => ({}));
+      const { action } = body;
+
+      if (action !== 'upvote' && action !== 'downvote') {
         return errorResponse('Invalid action', 400);
       }
 
-      // Check if user already voted
-      const [existingVote] = await Database.query(
-        'SELECT voteType FROM discussion_votes WHERE userId = ? AND targetType = "post" AND targetId = ?',
-        [user.id, postId]
-      );
+      const post = await Database.query('SELECT id FROM discussion_posts WHERE id = ?', [postId]);
 
-      if (existingVote) {
-        if (existingVote.voteType === action) {
-          // Remove vote if same action
-          await Database.query(
+      if (post.length === 0) {
+        return errorResponse('Post not found', 404);
+      }
+
+      // The vote row and the cached counts on the post have to move
+      // together. Previously they were separate statements, so a failure
+      // between them left the counts permanently out of step with the votes.
+      //
+      // Column names are written out in full rather than interpolated from
+      // `action`, so no request value can ever reach the SQL text.
+      const counts = await Database.transaction(async (connection) => {
+        const [existing] = (await connection.execute(
+          'SELECT voteType FROM discussion_votes WHERE userId = ? AND targetType = "post" AND targetId = ?',
+          [user.id, postId]
+        )) as any;
+
+        const previous = existing[0]?.voteType;
+
+        if (previous === action) {
+          // Same vote again withdraws it.
+          await connection.execute(
             'DELETE FROM discussion_votes WHERE userId = ? AND targetType = "post" AND targetId = ?',
             [user.id, postId]
           );
-          
-          // Update post count
-          const field = action === 'upvote' ? 'upvotes' : 'downvotes';
-          await Database.query(
-            `UPDATE discussion_posts SET ${field} = ${field} - 1 WHERE id = ?`,
+
+          // GREATEST(0, ...) keeps a count from going negative if the
+          // stored totals have already drifted.
+          await connection.execute(
+            action === 'upvote'
+              ? 'UPDATE discussion_posts SET upvotes = GREATEST(0, upvotes - 1) WHERE id = ?'
+              : 'UPDATE discussion_posts SET downvotes = GREATEST(0, downvotes - 1) WHERE id = ?',
             [postId]
           );
-        } else {
-          // Change vote
-          await Database.query(
+        } else if (previous) {
+          // Switching sides moves one count up and the other down.
+          await connection.execute(
             'UPDATE discussion_votes SET voteType = ? WHERE userId = ? AND targetType = "post" AND targetId = ?',
             [action, user.id, postId]
           );
-          
-          // Update post counts
-          const increaseField = action === 'upvote' ? 'upvotes' : 'downvotes';
-          const decreaseField = action === 'upvote' ? 'downvotes' : 'upvotes';
-          await Database.query(
-            `UPDATE discussion_posts SET ${increaseField} = ${increaseField} + 1, ${decreaseField} = ${decreaseField} - 1 WHERE id = ?`,
+
+          await connection.execute(
+            action === 'upvote'
+              ? 'UPDATE discussion_posts SET upvotes = upvotes + 1, downvotes = GREATEST(0, downvotes - 1) WHERE id = ?'
+              : 'UPDATE discussion_posts SET downvotes = downvotes + 1, upvotes = GREATEST(0, upvotes - 1) WHERE id = ?',
+            [postId]
+          );
+        } else {
+          await connection.execute(
+            'INSERT INTO discussion_votes (userId, targetType, targetId, voteType) VALUES (?, "post", ?, ?)',
+            [user.id, postId, action]
+          );
+
+          await connection.execute(
+            action === 'upvote'
+              ? 'UPDATE discussion_posts SET upvotes = upvotes + 1 WHERE id = ?'
+              : 'UPDATE discussion_posts SET downvotes = downvotes + 1 WHERE id = ?',
             [postId]
           );
         }
-      } else {
-        // Add new vote
-        await Database.query(
-          'INSERT INTO discussion_votes (userId, targetType, targetId, voteType) VALUES (?, "post", ?, ?)',
-          [user.id, postId, action]
-        );
-        
-        // Update post count
-        const field = action === 'upvote' ? 'upvotes' : 'downvotes';
-        await Database.query(
-          `UPDATE discussion_posts SET ${field} = ${field} + 1 WHERE id = ?`,
+
+        const [updated] = (await connection.execute(
+          'SELECT upvotes, downvotes FROM discussion_posts WHERE id = ?',
           [postId]
-        );
-      }
+        )) as any;
 
-      // Get updated vote counts
-      const [updatedPost] = await Database.query(
-        'SELECT upvotes, downvotes FROM discussion_posts WHERE id = ?',
-        [postId]
-      );
-
-      return successResponse({
-        upvotes: updatedPost.upvotes,
-        downvotes: updatedPost.downvotes
+        return {
+          ...updated[0],
+          // What this user's vote is now, so the client can render the
+          // button state without a second request.
+          myVote: previous === action ? null : action,
+        };
       });
 
+      return successResponse({
+        upvotes: counts?.upvotes ?? 0,
+        downvotes: counts?.downvotes ?? 0,
+        myVote: counts?.myVote ?? null,
+      });
     } catch (error) {
       console.error('Vote post error:', error);
       return errorResponse('Failed to vote on post', 500);

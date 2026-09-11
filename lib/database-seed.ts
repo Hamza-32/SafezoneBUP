@@ -1,12 +1,40 @@
 import { Database } from './database';
 import bcrypt from 'bcryptjs';
+import crypto from 'crypto';
+
+const BCRYPT_ROUNDS = 12;
+
+/**
+ * Password for the seeded administrator.
+ *
+ * A fixed password committed to the repository would be a known set of
+ * administrator credentials on every deployment that ran the seed. So the
+ * value comes from SEED_ADMIN_PASSWORD when set, and is otherwise random and
+ * printed once for the operator to save.
+ */
+function resolveSeedAdminPassword(): { password: string; generated: boolean } {
+  const provided = process.env.SEED_ADMIN_PASSWORD;
+
+  if (provided && provided.length >= 10) {
+    return { password: provided, generated: false };
+  }
+
+  if (provided) {
+    console.warn('⚠️  SEED_ADMIN_PASSWORD is shorter than 10 characters and was ignored.');
+  }
+
+  return { password: crypto.randomBytes(12).toString('base64url'), generated: true };
+}
 
 export const seedData = async () => {
   try {
-    console.log('🌱 Seeding SafezoneBUP database...');    // Create admin user
-    const adminPassword = await bcrypt.hash('admin123', 10);
-    await Database.query(`
-      INSERT IGNORE INTO users (firstName, lastName, email, password, role, phoneNumber, isVerified) 
+    console.log('🌱 Seeding SafezoneBUP database...');
+
+    // Create admin user
+    const admin = resolveSeedAdminPassword();
+    const adminPassword = await bcrypt.hash(admin.password, BCRYPT_ROUNDS);
+    const adminInsert = await Database.query(`
+      INSERT IGNORE INTO users (firstName, lastName, email, password, role, phoneNumber, isVerified)
       VALUES (?, ?, ?, ?, ?, ?, ?)
     `, [
       'System',
@@ -18,8 +46,28 @@ export const seedData = async () => {
       true
     ]);
 
-    // Create sample student users
-    const studentPassword = await bcrypt.hash('student123', 10);
+    // INSERT IGNORE is a no-op when the account already exists, in which
+    // case the password above was never applied and must not be reported.
+    const adminWasCreated = adminInsert?.affectedRows > 0;
+
+    if (!adminWasCreated) {
+      console.log('   Administrator admin@bup.edu.bd already exists, password left unchanged.');
+    } else if (admin.generated) {
+      console.log('');
+      console.log('   Seeded administrator');
+      console.log('     email:    admin@bup.edu.bd');
+      console.log(`     password: ${admin.password}`);
+      console.log('   Save this now. It is shown once and stored only as a hash.');
+      console.log('   Set SEED_ADMIN_PASSWORD to choose the password yourself.');
+      console.log('');
+    } else {
+      console.log('   Seeded administrator admin@bup.edu.bd using SEED_ADMIN_PASSWORD.');
+    }
+
+    // Create sample student users. These are demonstration accounts, so the
+    // password is intentionally simple and is safe only because these rows
+    // should never exist in a production database.
+    const studentPassword = await bcrypt.hash('student123', BCRYPT_ROUNDS);
     const students = [
       {
         firstName: 'Rahman',

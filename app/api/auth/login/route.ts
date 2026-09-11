@@ -1,63 +1,71 @@
+export const dynamic = 'force-dynamic';
+
 // Login endpoint - POST /api/auth/login
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';
-import { 
+import {
   comparePassword,
-  generateToken, 
-  validateRequiredFields, 
-  sanitizeInput, 
+  burnPasswordComparison,
+  generateToken,
+  assertSameOrigin,
+  setAuthCookie,
   logAction,
   successResponse,
-  errorResponse
+  errorResponse,
+  serverErrorResponse,
 } from '@/lib/api-middleware';
+import { enforceRateLimit } from '@/lib/rate-limit';
+import { parseBody, loginSchema } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
+  const originError = assertSameOrigin(request);
+  if (originError) return originError;
+
+  // Two limits: one on the address, one on the target account. The first
+  // slows a single host spraying many accounts, the second slows a
+  // distributed attack against one account.
+  const ipLimited = await enforceRateLimit(request, 'login-ip', 10, 15 * 60);
+  if (ipLimited) return ipLimited;
+
   try {
-    const body = await request.json();
-    const { email, password } = sanitizeInput(body);
+    const parsed = await parseBody(request, loginSchema);
+    if (!parsed.ok) return parsed.response;
 
-    // Validate required fields
-    const missing = validateRequiredFields({ email, password }, ['email', 'password']);
-    
-    if (missing.length > 0) {
-      return errorResponse('Missing required fields', 400, { missing });
-    }
+    const { email, password } = parsed.data;
 
-    // Find user by email (role is not needed for login)
+    const accountLimited = await enforceRateLimit(request, 'login-account', 5, 15 * 60, email);
+    if (accountLimited) return accountLimited;
+
     const users = await Database.query(
       'SELECT id, firstName, lastName, email, password, role, studentId, phoneNumber, isVerified FROM users WHERE email = ?',
       [email]
     );
 
     if (users.length === 0) {
+      // Spend the same time as a real check so response timing does not
+      // reveal whether the address is registered.
+      await burnPasswordComparison(password);
       return errorResponse('Invalid credentials', 401);
     }
 
     const user = users[0];
 
-    // Verify password
     const isValidPassword = await comparePassword(password, user.password);
-    
+
     if (!isValidPassword) {
       return errorResponse('Invalid credentials', 401);
     }
 
-    // Generate token
-    const token = generateToken(user.id);
-
-    // Remove password from response
     delete user.password;
 
-    // Log action
+    const token = generateToken(user.id);
+
     await logAction(user.id, 'LOGIN', 'users', user.id, { role: user.role }, request);
 
-    return successResponse({
-      user,
-      token
-    }, 'Login successful');
+    const response = successResponse({ user, token }, 'Login successful');
 
+    return setAuthCookie(response, token);
   } catch (error) {
-    console.error('Login error:', error);
-    return errorResponse('Login failed', 500);
+    return serverErrorResponse('Login error', error, 'Login failed');
   }
 }

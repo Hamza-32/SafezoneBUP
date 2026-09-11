@@ -1,103 +1,126 @@
+export const dynamic = 'force-dynamic';
+
 // Create complaint endpoint - POST /api/complaint/report
+//
+// Like emergency reports, this accepts anonymous submissions so someone can
+// report harassment without first creating an account.
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';
-import { 
-  withOptionalAuth,
-  validateRequiredFields, 
-  sanitizeInput, 
+import {
+  optionalUser,
+  assertSameOrigin,
   generateReferenceId,
   logAction,
   successResponse,
-  errorResponse
+  serverErrorResponse,
 } from '@/lib/api-middleware';
+import { enforceRateLimit } from '@/lib/rate-limit';
+import { parseBody, createComplaintSchema } from '@/lib/validation';
+
+// Categories escalated to high priority on submission.
+const HIGH_PRIORITY_CATEGORIES = new Set([
+  'harassment',
+  'bullying',
+  'discrimination',
+  'misconduct',
+]);
 
 export async function POST(request: NextRequest) {
-  return withOptionalAuth(request, async (req: NextRequest, user: any) => {
-    try {
-      const body = await request.json();
-      const {
+  const originError = assertSameOrigin(request);
+  if (originError) return originError;
+
+  const limited = await enforceRateLimit(request, 'complaint-report', 10, 10 * 60);
+  if (limited) return limited;
+
+  try {
+    const user = await optionalUser(request);
+
+    const parsed = await parseBody(request, createComplaintSchema);
+    if (!parsed.ok) return parsed.response;
+
+    const { title, description, category, location, priority, isAnonymous, attachments } =
+      parsed.data;
+
+    const referenceId = generateReferenceId('CPL');
+
+    // Previously this used a substring match, so any category containing
+    // "facility" or "security" was escalated. It is now an exact lookup.
+    const finalPriority = HIGH_PRIORITY_CATEGORIES.has(category) ? 'high' : priority || 'medium';
+
+    const result = await Database.query(
+      `INSERT INTO complaints
+       (referenceId, userId, title, description, category, location, priority, isAnonymous, attachments)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        referenceId,
+        user?.id ?? null,
         title,
         description,
         category,
-        location,
-        priority,
-        isAnonymous,
-        attachments
-      } = sanitizeInput(body);
+        location || null,
+        finalPriority,
+        isAnonymous ? 1 : 0,
+        attachments ? JSON.stringify(attachments) : null,
+      ]
+    );
 
-      // Validate required fields
-      const requiredFields = ['title', 'description', 'category'];
-      const missing = validateRequiredFields({ title, description, category }, requiredFields);
-      
-      if (missing.length > 0) {
-        return errorResponse('Missing required fields', 400, { missing });
-      }
+    const complaintId = result.insertId;
 
-      // Generate reference ID
-      const referenceId = generateReferenceId('CPL');
+    await notifyAdmins({ complaintId, referenceId, category, title, priority: finalPriority });
 
-      // Determine priority based on category if not provided
-      let finalPriority = priority || 'medium';
-      const highPriorityCategories = ['harassment', 'facility', 'security'];
-      if (highPriorityCategories.some(cat => category.toLowerCase().includes(cat.toLowerCase()))) {
-        finalPriority = 'high';
-      }
+    await logAction(
+      user?.id ?? null,
+      'CREATE_COMPLAINT',
+      'complaints',
+      complaintId,
+      { category, priority: finalPriority, isAnonymous: Boolean(isAnonymous) },
+      request
+    );
 
-      // Create complaint
-      const result = await Database.query(
-        `INSERT INTO complaints 
-         (userId, title, description, category, location, priority, isAnonymous, attachments) 
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
-          user?.id || null,
-          title,
-          description,
-          category,
-          location || null,
-          finalPriority,
-          isAnonymous || false,
-          attachments ? JSON.stringify(attachments) : null
-        ]
-      );
+    return successResponse(
+      { referenceId, priority: finalPriority, complaintId },
+      'Complaint submitted successfully',
+      201
+    );
+  } catch (error) {
+    return serverErrorResponse('Complaint submission error', error, 'Failed to submit complaint');
+  }
+}
 
-      const complaintId = result.insertId;
+async function notifyAdmins(complaint: {
+  complaintId: number;
+  referenceId: string;
+  category: string;
+  title: string;
+  priority: string;
+}): Promise<void> {
+  try {
+    const admins = await Database.query("SELECT id FROM users WHERE role = 'admin'");
 
-      // Create notifications for admins
-      const admins = await Database.query('SELECT id FROM users WHERE role = "admin"');
-      
-      for (const admin of admins) {
-        await Database.query(
-          `INSERT INTO notifications (userId, title, message, type, relatedId, relatedType) 
-           VALUES (?, ?, ?, ?, ?, ?)`,
-          [
-            admin.id,
-            `📋 New Complaint - ${category}`,
-            `New complaint titled "${title}" has been submitted. Priority: ${finalPriority.toUpperCase()}. Reference: ${referenceId}`,
-            'warning',
-            complaintId,
-            'complaint'
-          ]
-        );
-      }
+    if (admins.length === 0) return;
 
-      // Log action
-      if (user) {
-        await logAction(user.id, 'CREATE_COMPLAINT', 'complaints', complaintId, { 
-          category, 
-          priority: finalPriority,
-          isAnonymous 
-        }, request);
-      }
+    const notificationTitle = `📋 New Complaint - ${complaint.category}`;
+    const message =
+      `New complaint titled "${complaint.title}" has been submitted. ` +
+      `Priority: ${complaint.priority.toUpperCase()}. Reference: ${complaint.referenceId}`;
 
-      return successResponse({
-        referenceId,
-        priority: finalPriority,
-        complaintId
-      }, 'Complaint submitted successfully', 201);
+    // One statement instead of a query per administrator.
+    const placeholders = admins.map(() => '(?, ?, ?, ?, ?, ?)').join(', ');
+    const values = admins.flatMap((admin: { id: number }) => [
+      admin.id,
+      notificationTitle,
+      message,
+      'warning',
+      complaint.complaintId,
+      'complaint',
+    ]);
 
-    } catch (error) {
-      console.error('Complaint submission error:', error);
-      return errorResponse('Failed to submit complaint', 500);
-    }
-  });
+    await Database.query(
+      `INSERT INTO notifications (userId, title, message, type, relatedId, relatedType)
+       VALUES ${placeholders}`,
+      values
+    );
+  } catch (error) {
+    console.error(`Failed to notify admins of complaint ${complaint.referenceId}:`, error);
+  }
 }

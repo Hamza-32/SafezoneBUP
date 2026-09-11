@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MessageSquare, Plus, ThumbsUp, ThumbsDown, Flag, Eye, EyeOff, Clock } from 'lucide-react';
+import apiClient from '@/lib/api-client';
 
 interface DiscussionCategory {
   id: number;
@@ -52,11 +53,10 @@ export default function AnonymousDiscussionBoard() {
 
   const fetchCategories = async () => {
     try {
-      const response = await fetch('/api/discussions');
-      const result = await response.json();
-      if (result.success) {
-        setCategories(result.data);
-      }
+      // /api/discussions was an unguarded duplicate of this endpoint and has
+      // been removed.
+      const result = await apiClient.getDiscussionCategories();
+      setCategories(result.data || []);
     } catch (error) {
       console.error('Error fetching categories:', error);
     }

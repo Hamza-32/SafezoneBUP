@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, Plus, MapPin, Calendar, Phone, Mail, Eye, EyeOff, Package, CheckCircle } from 'lucide-react';
+import { toast } from 'sonner';
+import apiClient from '@/lib/api-client';
 
 interface LostAndFoundItem {
   id: number;
@@ -57,7 +59,6 @@ const statusColors = {
 
 export default function LostAndFound() {
   const [items, setItems] = useState<LostAndFoundItem[]>([]);
-  const [filteredItems, setFilteredItems] = useState<LostAndFoundItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -83,38 +84,17 @@ export default function LostAndFound() {
     fetchItems();
   }, []);
 
-  useEffect(() => {
-    filterItems();
-  }, [items, activeTab, searchTerm, selectedCategory]);
-
-  const fetchItems = async () => {
-    try {
-      const response = await fetch('/api/lost-and-found');
-      const result = await response.json();
-      if (result.success) {
-        setItems(result.data);
-      }
-    } catch (error) {
-      console.error('Error fetching items:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filterItems = () => {
+  const filteredItems = useMemo(() => {
     let filtered = items;
 
-    // Filter by type
     if (activeTab !== 'all') {
       filtered = filtered.filter(item => item.type === activeTab);
     }
 
-    // Filter by category
     if (selectedCategory && selectedCategory !== 'all') {
       filtered = filtered.filter(item => item.category === selectedCategory);
     }
 
-    // Filter by search term
     if (searchTerm) {
       filtered = filtered.filter(item =>
         item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -123,82 +103,84 @@ export default function LostAndFound() {
       );
     }
 
-    setFilteredItems(filtered);
+    return filtered;
+  }, [items, activeTab, searchTerm, selectedCategory]);
+
+  const fetchItems = async () => {
+    try {
+      const result = await apiClient.getLostAndFound();
+      setItems(result.data || []);
+    } catch (error) {
+      console.error('Error fetching items:', error);
+      toast.error('Could not load lost and found items.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmitItem = async () => {
     if (!newItem.title || !newItem.description || !newItem.category) {
-      alert('Please fill in all required fields');
+      toast.error('Please fill in all required fields');
       return;
     }
 
     try {
-      const userId = 1; // Placeholder - get from auth context
-      const response = await fetch('/api/lost-and-found', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          ...newItem
-        }),
+      // The server takes the poster's identity from the session, so no user
+      // id is sent from here.
+      await apiClient.createLostAndFoundItem({
+        type: newItem.type,
+        title: newItem.title,
+        description: newItem.description,
+        category: newItem.category,
+        location: newItem.location || undefined,
+        dateLostFound: newItem.dateLostFound || undefined,
+        imageUrl: newItem.imageUrl || undefined,
+        contactInfo: newItem.contactInfo,
+        isAnonymous: newItem.isAnonymous,
       });
 
-      const result = await response.json();
-      if (result.success) {
-        setNewItem({
-          type: 'lost',
-          title: '',
-          description: '',
-          category: '',
-          location: '',
-          dateLostFound: '',
-          imageUrl: '',
-          contactInfo: {
-            email: '',
-            phone: '',
-            preferredContact: 'email'
-          },
-          isAnonymous: false
-        });
-        setShowNewItemDialog(false);
-        fetchItems();
-        alert('Item posted successfully!');
-      } else {
-        alert('Failed to post item');
-      }
-    } catch (error) {
+      setNewItem({
+        type: 'lost',
+        title: '',
+        description: '',
+        category: '',
+        location: '',
+        dateLostFound: '',
+        imageUrl: '',
+        contactInfo: {
+          email: '',
+          phone: '',
+          preferredContact: 'email'
+        },
+        isAnonymous: false
+      });
+      setShowNewItemDialog(false);
+      fetchItems();
+      toast.success('Item posted');
+    } catch (error: any) {
       console.error('Error posting item:', error);
-      alert('Failed to post item');
+      toast.error(
+        error?.status === 401
+          ? 'Sign in to post a lost or found item.'
+          : error?.message || 'Failed to post item'
+      );
     }
   };
 
   const handleMarkResolved = async (id: number) => {
-    if (confirm('Mark this item as resolved?')) {
-      try {
-        const response = await fetch('/api/lost-and-found', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ 
-            id, 
-            status: 'resolved',
-            resolvedBy: 1 // Placeholder - get from auth context
-          }),
-        });
+    if (!confirm('Mark this item as resolved?')) return;
 
-        const result = await response.json();
-        if (result.success) {
-          fetchItems();
-        } else {
-          alert('Failed to update item');
-        }
-      } catch (error) {
-        console.error('Error updating item:', error);
-        alert('Failed to update item');
-      }
+    try {
+      await apiClient.updateLostAndFoundItem(id, 'resolved');
+      fetchItems();
+      toast.success('Item marked as resolved');
+    } catch (error: any) {
+      console.error('Error updating item:', error);
+      toast.error(
+        error?.status === 403
+          ? 'Only the person who posted this item can resolve it.'
+          : error?.message || 'Failed to update item'
+      );
     }
   };
 
@@ -479,6 +461,7 @@ export default function LostAndFound() {
                 <div className="space-y-4">
                   {item.imageUrl && (
                     <div className="w-32 h-32">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img 
                         src={item.imageUrl} 
                         alt={item.title}

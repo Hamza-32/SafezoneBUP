@@ -1,12 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Search, Phone, Mail, ExternalLink, AlertTriangle, Heart, Shield, HelpCircle, Building } from 'lucide-react';
+import apiClient from '@/lib/api-client';
 
 interface SafetyResource {
   id: number;
@@ -43,7 +44,6 @@ const categoryColors = {
 
 export default function SafetyResourceHub() {
   const [resources, setResources] = useState<SafetyResource[]>([]);
-  const [filteredResources, setFilteredResources] = useState<SafetyResource[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [loading, setLoading] = useState(true);
@@ -52,25 +52,7 @@ export default function SafetyResourceHub() {
     fetchResources();
   }, []);
 
-  useEffect(() => {
-    filterResources();
-  }, [resources, searchTerm, selectedCategory]);
-
-  const fetchResources = async () => {
-    try {
-      const response = await fetch('/api/resources');
-      const result = await response.json();
-      if (result.success) {
-        setResources(result.data);
-      }
-    } catch (error) {
-      console.error('Error fetching resources:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filterResources = () => {
+  const filteredResources = useMemo(() => {
     let filtered = resources;
 
     if (selectedCategory !== 'all') {
@@ -85,7 +67,20 @@ export default function SafetyResourceHub() {
       );
     }
 
-    setFilteredResources(filtered);
+    return filtered;
+  }, [resources, searchTerm, selectedCategory]);
+
+  const fetchResources = async () => {
+    try {
+      // /api/resources was an unguarded duplicate of this endpoint and has
+      // been removed. This one nests the list under data.resources.
+      const result = await apiClient.getSafetyResources();
+      setResources(result.data?.resources || []);
+    } catch (error) {
+      console.error('Error fetching resources:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const categories = [

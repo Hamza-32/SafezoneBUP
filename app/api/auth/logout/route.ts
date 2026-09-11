@@ -1,23 +1,33 @@
+export const dynamic = 'force-dynamic';
+
 // Logout endpoint - POST /api/auth/logout
 import { NextRequest } from 'next/server';
-import { 
-  withAuth,
+import {
+  optionalUser,
+  assertSameOrigin,
+  clearAuthCookie,
   logAction,
   successResponse,
-  errorResponse
+  serverErrorResponse,
 } from '@/lib/api-middleware';
 
 export async function POST(request: NextRequest) {
-  return withAuth(request, async (req: NextRequest, user: any) => {
-    try {
-      // Log action
+  const originError = assertSameOrigin(request);
+  if (originError) return originError;
+
+  try {
+    // Logout deliberately does not require a valid session. Someone holding
+    // an expired or malformed token must still be able to clear it.
+    const user = await optionalUser(request);
+
+    if (user) {
       await logAction(user.id, 'LOGOUT', 'users', user.id, {}, request);
-
-      return successResponse(null, 'Logged out successfully');
-
-    } catch (error) {
-      console.error('Logout error:', error);
-      return errorResponse('Logout failed', 500);
     }
-  });
+
+    const response = successResponse(null, 'Logged out successfully');
+
+    return clearAuthCookie(response);
+  } catch (error) {
+    return serverErrorResponse('Logout error', error, 'Logout failed');
+  }
 }

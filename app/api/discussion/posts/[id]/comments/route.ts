@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // Discussion Comments API - POST /api/discussion/posts/[id]/comments
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';

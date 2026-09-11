@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // Discussion Posts API - GET /api/discussion/posts
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';

@@ -29,16 +29,51 @@ export default function ComplaintForm({ onNavigate }: ComplaintFormProps) {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const [referenceId, setReferenceId] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setSubmitError(null)
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false)
+    // The complaint schema has no dedicated fields for these, so they are
+    // kept with the description where a reviewer will read them.
+    const contextLines = [
+      formData.reporterName ? `Reporter: ${formData.reporterName}` : null,
+      formData.reporterContact ? `Contact: ${formData.reporterContact}` : null,
+      formData.studentId ? `Student ID involved: ${formData.studentId}` : null,
+      formData.incidentDate ? `Incident date: ${formData.incidentDate}` : null,
+    ].filter(Boolean)
+
+    const description = [formData.description.trim(), ...contextLines].filter(Boolean).join("\n")
+
+    try {
+      const response = await fetch("/api/complaint/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `${formData.complaintType || "General"} complaint`,
+          description,
+          category: formData.complaintType,
+          location: formData.location || undefined,
+          isAnonymous: formData.isAnonymous,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Your complaint could not be submitted.")
+      }
+
+      setReferenceId(result.data?.referenceId ?? null)
       setIsSubmitted(true)
-    }, 2000)
+    } catch (error: any) {
+      setSubmitError(error?.message || "Your complaint could not be submitted. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (isSubmitted) {
@@ -53,9 +88,11 @@ export default function ComplaintForm({ onNavigate }: ComplaintFormProps) {
             <p className="text-blue-700 mb-4">
               Your complaint has been submitted successfully. The student will be notified to verify this report.
             </p>
-            <p className="text-sm text-blue-600 mb-6">
-              Reference ID: <span className="font-mono font-semibold">CMP-{Date.now().toString().slice(-6)}</span>
-            </p>
+            {referenceId && (
+              <p className="text-sm text-blue-600 mb-6">
+                Reference ID: <span className="font-mono font-semibold">{referenceId}</span>
+              </p>
+            )}
             <div className="space-y-3">
               <Button
                 onClick={() => onNavigate("login")}
@@ -224,10 +261,19 @@ export default function ComplaintForm({ onNavigate }: ComplaintFormProps) {
                 </Label>
               </div>
 
+              {submitError && (
+                <div
+                  role="alert"
+                  className="p-3 rounded-lg border border-red-300 bg-red-50 text-sm text-red-700"
+                >
+                  {submitError}
+                </div>
+              )}
+
               <Button
                 type="submit"
                 className="w-full bg-[#837E6B] hover:bg-[#837E6B]/90 text-white font-semibold"
-                disabled={isSubmitting}
+                disabled={isSubmitting || !formData.complaintType || !formData.description.trim()}
               >
                 {isSubmitting ? (
                   <>

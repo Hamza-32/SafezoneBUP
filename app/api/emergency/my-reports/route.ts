@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // Get user's emergency reports endpoint - GET /api/emergency/my-reports
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';

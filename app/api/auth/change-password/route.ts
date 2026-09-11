@@ -1,65 +1,77 @@
+export const dynamic = 'force-dynamic';
+
 // Change password endpoint - PUT /api/auth/change-password
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';
-import { 
-  withAuth,
+import {
+  requireAuth,
   hashPassword,
   comparePassword,
-  validateRequiredFields, 
-  sanitizeInput, 
+  generateToken,
+  setAuthCookie,
   logAction,
   successResponse,
-  errorResponse
+  errorResponse,
+  serverErrorResponse,
 } from '@/lib/api-middleware';
+import { enforceRateLimit } from '@/lib/rate-limit';
+import { parseBody, changePasswordSchema } from '@/lib/validation';
 
 export async function PUT(request: NextRequest) {
-  return withAuth(request, async (req: NextRequest, user: any) => {
-    try {
-      const body = await request.json();
-      const { currentPassword, newPassword } = sanitizeInput(body);
+  const auth = await requireAuth(request);
+  if (!auth.ok) return auth.response;
 
-      // Validate required fields
-      const missing = validateRequiredFields({ currentPassword, newPassword }, ['currentPassword', 'newPassword']);
-      
-      if (missing.length > 0) {
-        return errorResponse('Missing required fields', 400, { missing });
-      }
+  // Guessing the current password here is as good as guessing it at the
+  // login screen, so the same kind of limit applies.
+  const limited = await enforceRateLimit(request, 'change-password', 5, 15 * 60, String(auth.user.id));
+  if (limited) return limited;
 
-      // Validate new password strength
-      if (newPassword.length < 6) {
-        return errorResponse('New password must be at least 6 characters long', 400);
-      }
+  try {
+    // The schema enforces the full password policy, which the old inline
+    // check (six characters, no character classes) did not.
+    const parsed = await parseBody(request, changePasswordSchema);
+    if (!parsed.ok) return parsed.response;
 
-      // Get current password hash
-      const [userData] = await Database.query(
-        'SELECT password FROM users WHERE id = ?',
-        [user.id]
-      );
+    const { currentPassword, newPassword } = parsed.data;
 
-      // Verify current password
-      const isValidPassword = await comparePassword(currentPassword, userData.password);
-      
-      if (!isValidPassword) {
-        return errorResponse('Current password is incorrect', 401);
-      }
+    const [userData] = await Database.query('SELECT password FROM users WHERE id = ?', [
+      auth.user.id,
+    ]);
 
-      // Hash new password
-      const hashedNewPassword = await hashPassword(newPassword);
-
-      // Update password
-      await Database.query(
-        'UPDATE users SET password = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?',
-        [hashedNewPassword, user.id]
-      );
-
-      // Log action
-      await logAction(user.id, 'CHANGE_PASSWORD', 'users', user.id, {}, request);
-
-      return successResponse(null, 'Password changed successfully');
-
-    } catch (error) {
-      console.error('Change password error:', error);
-      return errorResponse('Failed to change password', 500);
+    if (!userData) {
+      return errorResponse('Account not found', 404);
     }
-  });
+
+    const isValidPassword = await comparePassword(currentPassword, userData.password);
+
+    if (!isValidPassword) {
+      return errorResponse('Current password is incorrect', 401);
+    }
+
+    if (currentPassword === newPassword) {
+      return errorResponse('New password must be different from the current one', 400);
+    }
+
+    const hashedNewPassword = await hashPassword(newPassword);
+
+    await Database.query(
+      'UPDATE users SET password = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?',
+      [hashedNewPassword, auth.user.id]
+    );
+
+    await logAction(auth.user.id, 'CHANGE_PASSWORD', 'users', auth.user.id, {}, request);
+
+    // Issue a fresh session so the person changing their password keeps
+    // working without re-authenticating.
+    //
+    // Note: tokens issued earlier remain valid until they expire, because
+    // nothing tracks them. Invalidating other sessions on a password change
+    // needs either a token version column on users or a session table.
+    const token = generateToken(auth.user.id);
+    const response = successResponse({ token }, 'Password changed successfully');
+
+    return setAuthCookie(response, token);
+  } catch (error) {
+    return serverErrorResponse('Change password error', error, 'Failed to change password');
+  }
 }

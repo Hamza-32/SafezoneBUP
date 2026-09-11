@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // Get complaints endpoint - GET /api/complaint/reports
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';

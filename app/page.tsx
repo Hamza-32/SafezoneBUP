@@ -24,27 +24,24 @@ export default function SafezoneBUPApp() {
   const [user, setUser] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
 
-  // Load user from token on app start
+  // Restore the session on app start.
+  //
+  // The session lives in an httpOnly cookie, which this code cannot read, so
+  // the only way to know whether someone is signed in is to ask the server.
+  // A 401 here simply means "not signed in" and is not an error worth showing.
   useEffect(() => {
     const loadUser = async () => {
       try {
-        const token = localStorage.getItem("safezonebup-token")
-        if (token) {
-          apiClient.setToken(token)
-          const response = await apiClient.getCurrentUser()
-          
-          // Extract user from the response - response is the full API response
-          const userData = (response as any).data?.user || response.user
-          
-          if (userData) {
-            setUser(userData)
-          }
+        const response = await apiClient.getCurrentUser()
+        const userData = (response as any).data?.user || response.user
+
+        if (userData) {
+          setUser(userData)
         }
-      } catch (error) {
-        console.error("Failed to load user:", error)
-        // Clear invalid token
-        localStorage.removeItem("safezonebup-token")
-        apiClient.setToken(null)
+      } catch (error: any) {
+        if (error?.status !== 401) {
+          console.error("Failed to load user:", error)
+        }
       } finally {
         setIsLoading(false)
       }
@@ -85,14 +82,15 @@ export default function SafezoneBUPApp() {
     }
   }
 
-  const handleSignup = async (role: "admin" | "student", signupData: any) => {
+  // The role argument is accepted so the signup form keeps its existing
+  // signature, but it is deliberately not sent: self-registration always
+  // creates a student, and the server would ignore a role field anyway.
+  const handleSignup = async (_role: "admin" | "student", signupData: any) => {
     try {
       setIsLoading(true)
-      const response = await apiClient.register({
-        ...signupData,
-        role
-      })
-      
+      const response = await apiClient.register(signupData)
+
+
       // Extract user from the response - response is the full API response
       const userData = (response as any).data?.user || response.user
       
@@ -144,7 +142,14 @@ export default function SafezoneBUPApp() {
     try {
       setIsLoading(true)
       const response = await apiClient.updateProfile(profileData)
-      setUser(response.user)
+      // The API nests the record under data.user. Reading response.user gave
+      // undefined, which cleared the signed-in user and logged them out.
+      const userData = (response as any).data?.user || response.user
+
+      if (userData) {
+        setUser(userData)
+      }
+
       toast.success("Profile updated successfully")
     } catch (error: any) {
       console.error("Profile update error:", error)

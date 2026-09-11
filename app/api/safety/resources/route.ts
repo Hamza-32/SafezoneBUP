@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // Safety Resources API - GET /api/safety/resources
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';

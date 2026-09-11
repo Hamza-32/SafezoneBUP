@@ -1,98 +1,99 @@
+export const dynamic = 'force-dynamic';
+
 // Register endpoint - POST /api/auth/register
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';
-import { 
-  hashPassword, 
-  generateToken, 
-  validateRequiredFields, 
-  sanitizeInput, 
+import {
+  hashPassword,
+  generateToken,
+  optionalUser,
+  assertSameOrigin,
+  setAuthCookie,
   logAction,
   successResponse,
-  errorResponse
+  errorResponse,
+  serverErrorResponse,
 } from '@/lib/api-middleware';
+import { enforceRateLimit } from '@/lib/rate-limit';
+import { parseBody, registerSchema, adminCreateUserSchema } from '@/lib/validation';
 
 export async function POST(request: NextRequest) {
+  const originError = assertSameOrigin(request);
+  if (originError) return originError;
+
+  // Cap account creation per address so the user table cannot be flooded.
+  const limited = await enforceRateLimit(request, 'register', 5, 60 * 60);
+  if (limited) return limited;
+
   try {
-    const body = await request.json();
-    const { firstName, lastName, email, password, role, studentId, phoneNumber } = sanitizeInput(body);
+    // Only an authenticated administrator may choose the role of a new
+    // account. For everyone else the role is fixed at 'student', so a
+    // self-service signup can never mint an admin or security account.
+    const caller = await optionalUser(request);
+    const callerIsAdmin = caller?.role === 'admin';
 
-    // Validate required fields
-    const requiredFields = ['firstName', 'lastName', 'email', 'password', 'role'];
-    const missing = validateRequiredFields({ firstName, lastName, email, password, role }, requiredFields);
-    
-    if (missing.length > 0) {
-      return errorResponse('Missing required fields', 400, { missing });
-    }
+    const parsed = await parseBody(
+      request,
+      callerIsAdmin ? adminCreateUserSchema : registerSchema
+    );
+    if (!parsed.ok) return parsed.response;
 
-    // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-      return errorResponse('Invalid email format', 400);
-    }
-
-    // Validate password strength
-    if (password.length < 6) {
-      return errorResponse('Password must be at least 6 characters long', 400);
-    }
-
-    // Validate role
-    if (!['student', 'admin', 'security'].includes(role)) {
-      return errorResponse('Invalid role. Must be student, admin, or security', 400);
-    }
+    const { firstName, lastName, email, password, studentId, phoneNumber } = parsed.data;
+    const role = callerIsAdmin ? (parsed.data as { role: string }).role : 'student';
 
     // Check if user already exists
-    const existingUser = await Database.query(
-      'SELECT id FROM users WHERE email = ?', 
-      [email]
-    );
+    const existingUser = await Database.query('SELECT id FROM users WHERE email = ?', [email]);
 
     if (existingUser.length > 0) {
       return errorResponse('User with this email already exists', 409);
     }
 
-    // Check if student ID is already taken (for students)
-    if (role === 'student' && studentId) {
-      const existingStudent = await Database.query(
-        'SELECT id FROM users WHERE studentId = ?', 
-        [studentId]
-      );
+    // Check if student ID is already taken
+    if (studentId) {
+      const existingStudent = await Database.query('SELECT id FROM users WHERE studentId = ?', [
+        studentId,
+      ]);
 
       if (existingStudent.length > 0) {
         return errorResponse('Student ID already exists', 409);
       }
     }
 
-    // Hash password
     const hashedPassword = await hashPassword(password);
 
-    // Create user
     const result = await Database.query(
-      `INSERT INTO users (firstName, lastName, email, password, role, studentId, phoneNumber) 
+      `INSERT INTO users (firstName, lastName, email, password, role, studentId, phoneNumber)
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [firstName, lastName, email, hashedPassword, role, studentId || null, phoneNumber || null]
     );
 
     const userId = result.insertId;
 
-    // Generate token
-    const token = generateToken(userId);
-
-    // Get created user (without password)
     const [user] = await Database.query(
       'SELECT id, firstName, lastName, email, role, studentId, phoneNumber, isVerified, createdAt FROM users WHERE id = ?',
       [userId]
     );
 
-    // Log action
-    await logAction(userId, 'REGISTER', 'users', userId, { role }, request);
+    await logAction(
+      caller?.id ?? userId,
+      callerIsAdmin ? 'ADMIN_CREATE_USER' : 'REGISTER',
+      'users',
+      userId,
+      { role },
+      request
+    );
 
-    return successResponse({
-      user,
-      token
-    }, 'User registered successfully', 201);
+    // An admin provisioning someone else must not have their own session
+    // replaced by the new account's token.
+    if (callerIsAdmin) {
+      return successResponse({ user }, 'User created successfully', 201);
+    }
 
+    const token = generateToken(userId);
+    const response = successResponse({ user, token }, 'User registered successfully', 201);
+
+    return setAuthCookie(response, token);
   } catch (error) {
-    console.error('Registration error:', error);
-    return errorResponse('Registration failed', 500);
+    return serverErrorResponse('Registration error', error, 'Registration failed');
   }
 }

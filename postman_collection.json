@@ -1,0 +1,351 @@
+{
+  "info": {
+    "name": "SafezoneBUP API",
+    "description": "Endpoints served by the Next.js app under app/api. Authentication uses the httpOnly safezone-token cookie set by login, which Postman stores and resends automatically; a Bearer token is also accepted. Set the baseUrl variable to your deployment.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "System",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/health", "host": ["{{baseUrl}}"], "path": ["api", "health"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register (always creates a student)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Test\",\n  \"lastName\": \"Student\",\n  \"email\": \"test.student@bup.edu.bd\",\n  \"password\": \"CorrectHorse9\",\n  \"studentId\": \"BUP2024999\",\n  \"phoneNumber\": \"+88017-0000-0000\"\n}"
+            },
+            "description": "The role is fixed at student. Sending a role field has no effect unless the request carries an administrator session, in which case the role is honoured and no session cookie is issued for the new account.",
+            "url": { "raw": "{{baseUrl}}/api/auth/register", "host": ["{{baseUrl}}"], "path": ["api", "auth", "register"] }
+          }
+        },
+        {
+          "name": "Login",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@bup.edu.bd\",\n  \"password\": \"replace-with-your-seeded-password\"\n}"
+            },
+            "description": "Sets the safezone-token cookie. Rate limited to 10 attempts per address and 5 per account in 15 minutes.",
+            "url": { "raw": "{{baseUrl}}/api/auth/login", "host": ["{{baseUrl}}"], "path": ["api", "auth", "login"] }
+          }
+        },
+        {
+          "name": "Current user",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/auth/me", "host": ["{{baseUrl}}"], "path": ["api", "auth", "me"] }
+          }
+        },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"CorrectHorse9\",\n  \"newPassword\": \"AnotherHorse10\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/auth/change-password", "host": ["{{baseUrl}}"], "path": ["api", "auth", "change-password"] }
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/auth/logout", "host": ["{{baseUrl}}"], "path": ["api", "auth", "logout"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Emergency",
+      "item": [
+        {
+          "name": "Submit report (session optional)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Medical emergency at Library\",\n  \"description\": \"Someone has collapsed on the second floor.\",\n  \"category\": \"medical\",\n  \"location\": \"Central Library, 2nd floor\",\n  \"latitude\": 23.8103,\n  \"longitude\": 90.4125,\n  \"isAnonymous\": false\n}"
+            },
+            "description": "Categories: medical, fire, security, accident, violence, other. Medical, fire, security and violence are forced to critical priority.",
+            "url": { "raw": "{{baseUrl}}/api/emergency/report", "host": ["{{baseUrl}}"], "path": ["api", "emergency", "report"] }
+          }
+        },
+        {
+          "name": "List reports (staff)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/emergency/reports?page=1&limit=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "emergency", "reports"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "My reports",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/emergency/my-reports", "host": ["{{baseUrl}}"], "path": ["api", "emergency", "my-reports"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Complaints",
+      "item": [
+        {
+          "name": "Submit complaint (session optional)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"harassment complaint\",\n  \"description\": \"Describe what happened.\",\n  \"category\": \"harassment\",\n  \"location\": \"Engineering building\",\n  \"isAnonymous\": true\n}"
+            },
+            "description": "Categories: facility, service, academic, harassment, bullying, discrimination, misconduct, property, noise, other.",
+            "url": { "raw": "{{baseUrl}}/api/complaint/report", "host": ["{{baseUrl}}"], "path": ["api", "complaint", "report"] }
+          }
+        },
+        {
+          "name": "List complaints (staff)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/complaint/reports", "host": ["{{baseUrl}}"], "path": ["api", "complaint", "reports"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Safety check-in",
+      "item": [
+        {
+          "name": "My check-ins",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Scoped to the signed-in user. Staff may add ?userId= to read another user's check-ins.",
+            "url": { "raw": "{{baseUrl}}/api/checkin", "host": ["{{baseUrl}}"], "path": ["api", "checkin"] }
+          }
+        },
+        {
+          "name": "Create check-in",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"expectedArrivalTime\": \"2026-09-11T22:30:00Z\",\n  \"location\": \"Walking from library to Hall 3\",\n  \"emergencyContactId\": null,\n  \"notes\": \"Alone, poorly lit route.\"\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/checkin", "host": ["{{baseUrl}}"], "path": ["api", "checkin"] }
+          }
+        },
+        {
+          "name": "Raise SOS",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": 1,\n  \"status\": \"alerted\",\n  \"sosTriggered\": true\n}"
+            },
+            "description": "Only the owner of the check-in or staff may update it. Once raised, sosTriggered cannot be cleared through this endpoint.",
+            "url": { "raw": "{{baseUrl}}/api/checkin", "host": ["{{baseUrl}}"], "path": ["api", "checkin"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Lost and found",
+      "item": [
+        {
+          "name": "List items",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Public. Contact details are only included for signed-in viewers.",
+            "url": {
+              "raw": "{{baseUrl}}/api/lost-and-found?status=active&limit=50&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "lost-and-found"],
+              "query": [
+                { "key": "status", "value": "active" },
+                { "key": "limit", "value": "50" },
+                { "key": "offset", "value": "0" },
+                { "key": "type", "value": "lost", "disabled": true },
+                { "key": "category", "value": "electronics", "disabled": true },
+                { "key": "search", "value": "wallet", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Post item",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"type\": \"lost\",\n  \"title\": \"Black laptop bag\",\n  \"description\": \"Left in the cafeteria around noon.\",\n  \"category\": \"accessories\",\n  \"location\": \"Cafeteria\",\n  \"contactInfo\": { \"email\": \"me@bup.edu.bd\", \"preferredContact\": \"email\" },\n  \"isAnonymous\": false\n}"
+            },
+            "description": "The poster is taken from the session. Categories: electronics, clothing, books, accessories, documents, keys, other.",
+            "url": { "raw": "{{baseUrl}}/api/lost-and-found", "host": ["{{baseUrl}}"], "path": ["api", "lost-and-found"] }
+          }
+        },
+        {
+          "name": "Mark resolved",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"id\": 1,\n  \"status\": \"resolved\"\n}" },
+            "description": "Owner or staff only.",
+            "url": { "raw": "{{baseUrl}}/api/lost-and-found", "host": ["{{baseUrl}}"], "path": ["api", "lost-and-found"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Resources and discussion",
+      "item": [
+        {
+          "name": "Safety resources",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Public read. Creating a resource requires an administrator.",
+            "url": { "raw": "{{baseUrl}}/api/safety/resources", "host": ["{{baseUrl}}"], "path": ["api", "safety", "resources"] }
+          }
+        },
+        {
+          "name": "Create resource (admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Night escort service\",\n  \"description\": \"Walk-home escort after dark.\",\n  \"category\": \"campus_resources\",\n  \"content\": \"Call the security desk to request an escort between 8pm and 6am.\",\n  \"contactInfo\": { \"phone\": \"+88024-9870-5700\" },\n  \"priority\": 10\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/safety/resources", "host": ["{{baseUrl}}"], "path": ["api", "safety", "resources"] }
+          }
+        },
+        {
+          "name": "Discussion categories",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/discussion/categories", "host": ["{{baseUrl}}"], "path": ["api", "discussion", "categories"] }
+          }
+        },
+        {
+          "name": "Discussion posts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/discussion/posts", "host": ["{{baseUrl}}"], "path": ["api", "discussion", "posts"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Emergency contacts",
+      "item": [
+        {
+          "name": "List contacts",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Public, so hotline numbers are reachable without signing in.",
+            "url": { "raw": "{{baseUrl}}/api/contacts", "host": ["{{baseUrl}}"], "path": ["api", "contacts"] }
+          }
+        },
+        {
+          "name": "Create contact (admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Campus Security Desk\",\n  \"phoneNumber\": \"+88024-9870-5700\",\n  \"department\": \"Security\",\n  \"displayOrder\": 1\n}"
+            },
+            "url": { "raw": "{{baseUrl}}/api/contacts", "host": ["{{baseUrl}}"], "path": ["api", "contacts"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Dashboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/admin/dashboard", "host": ["{{baseUrl}}"], "path": ["api", "admin", "dashboard"] }
+          }
+        },
+        {
+          "name": "Moderation queue",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/api/admin/moderation", "host": ["{{baseUrl}}"], "path": ["api", "admin", "moderation"] }
+          }
+        },
+        {
+          "name": "Award badge or points (admin)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"userId\": 2,\n  \"badgeId\": 1,\n  \"points\": 50\n}" },
+            "url": { "raw": "{{baseUrl}}/api/badges", "host": ["{{baseUrl}}"], "path": ["api", "badges"] }
+          }
+        },
+        {
+          "name": "Set up safety tables (admin)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "description": "Requires an administrator session. First-time bootstrap is done from the CLI with npm run db:setup.",
+            "url": { "raw": "{{baseUrl}}/api/admin/setup-database", "host": ["{{baseUrl}}"], "path": ["api", "admin", "setup-database"] }
+          }
+        }
+      ]
+    }
+  ]
+}

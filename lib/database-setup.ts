@@ -22,10 +22,13 @@ export const createTables = async () => {
     await Database.query(`
       CREATE TABLE IF NOT EXISTS emergency_reports (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        userId INT NOT NULL,
+        referenceId VARCHAR(64) NULL UNIQUE,
+        -- Nullable: an emergency may be reported by someone who is not
+        -- signed in, and that report still has to be stored.
+        userId INT NULL,
         title VARCHAR(255) NOT NULL,
         description TEXT NOT NULL,
-        category ENUM('medical', 'security', 'fire', 'other') NOT NULL,
+        category ENUM('medical', 'security', 'fire', 'accident', 'violence', 'other') NOT NULL,
         location VARCHAR(255) NOT NULL,
         latitude DECIMAL(10, 8),
         longitude DECIMAL(11, 8),
@@ -42,10 +45,13 @@ export const createTables = async () => {
     await Database.query(`
       CREATE TABLE IF NOT EXISTS complaints (
         id INT AUTO_INCREMENT PRIMARY KEY,
-        userId INT NOT NULL,
+        referenceId VARCHAR(64) NULL UNIQUE,
+        -- Nullable for the same reason as emergency_reports.userId.
+        userId INT NULL,
         title VARCHAR(255) NOT NULL,
         description TEXT NOT NULL,
-        category ENUM('facility', 'service', 'academic', 'harassment', 'other') NOT NULL,
+        category ENUM('facility', 'service', 'academic', 'harassment', 'bullying',
+                      'discrimination', 'misconduct', 'property', 'noise', 'other') NOT NULL,
         location VARCHAR(255),
         status ENUM('pending', 'investigating', 'resolved', 'closed') DEFAULT 'pending',
         priority ENUM('low', 'medium', 'high') DEFAULT 'medium',

@@ -10,6 +10,9 @@ const inter = Inter({ subsets: ["latin"] })
 export const metadata: Metadata = {
   title: "SafezoneBUP - Bangladesh University of Professionals Safety Platform",
   description: "Campus safety platform for BUP students, faculty, and staff. Report emergencies, file complaints, and stay connected with campus security.",
+  icons: {
+    icon: "/bup-logo.png",
+  },
     generator: 'v0.dev'
 }
 

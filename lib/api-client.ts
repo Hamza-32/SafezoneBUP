@@ -1,7 +1,13 @@
-// API Configuration - Empty base URL means same-origin requests to Next.js API routes
+// Browser-side API client.
+//
+// Authentication rides on the httpOnly `safezone-token` cookie that the login
+// and register endpoints set. The token is deliberately NOT kept in
+// localStorage: anything stored there is readable by injected script, so an
+// XSS bug would hand over a working session. Because the cookie is sent
+// automatically with same-origin requests, nothing here has to attach it.
+
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
-// Types
 interface ApiResponse<T = any> {
   [key: string]: T;
 }
@@ -10,6 +16,7 @@ interface LoginResponse {
   message: string;
   user: any;
   token: string;
+  data?: { user: any; token: string };
 }
 
 interface RequestOptions {
@@ -18,137 +25,91 @@ interface RequestOptions {
   body?: string;
 }
 
-// API Client class
+/** Error carrying the HTTP status, so callers can tell 401 from 500. */
+export class ApiError extends Error {
+  status: number;
+  details?: unknown;
+
+  constructor(message: string, status: number, details?: unknown) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.details = details;
+  }
+}
+
 class ApiClient {
   private baseURL: string;
-  private token: string | null;
-  
+
   constructor() {
     this.baseURL = API_BASE_URL;
-    this.token = null;
-    
-    // Load token from localStorage if available
-    if (typeof window !== 'undefined') {
-      this.token = localStorage.getItem('safezonebup-token');
-    }
   }
 
-  // Set authentication token
-  setToken(token: string | null): void {
-    this.token = token;
-    if (typeof window !== 'undefined') {
-      if (token) {
-        localStorage.setItem('safezonebup-token', token);
-      } else {
-        localStorage.removeItem('safezonebup-token');
-      }
-    }
-  }
-
-  // Get authentication headers
-  getHeaders(): Record<string, string> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-    };
-
-    if (this.token) {
-      headers['Authorization'] = `Bearer ${this.token}`;
-    }
-
-    return headers;
-  }
-
-  // Generic request method
   async request<T = any>(endpoint: string, options: RequestOptions = {}): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
-    
-    const config: RequestInit = {
-      headers: this.getHeaders(),
+
+    const response = await fetch(url, {
       ...options,
-    };
+      headers: {
+        'Content-Type': 'application/json',
+        ...(options.headers || {}),
+      },
+      // Send the session cookie. This is the default for same-origin
+      // requests, but stating it keeps the intent obvious.
+      credentials: 'same-origin',
+    });
 
-    try {
-      const response = await fetch(url, config);
-      
-      // Check if response is ok
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-      }
+    const payload = await response.json().catch(() => ({}));
 
-      return await response.json();
-    } catch (error) {
-      console.error('API request failed:', error);
-      throw error;
+    if (!response.ok) {
+      throw new ApiError(
+        payload.error || `Request failed with status ${response.status}`,
+        response.status,
+        payload.details
+      );
     }
+
+    return payload as T;
   }
 
-  // GET request
   async get<T = any>(endpoint: string, params: Record<string, any> = {}): Promise<T> {
-    const query = new URLSearchParams(params).toString();
+    const filtered = Object.entries(params).filter(
+      ([, value]) => value !== undefined && value !== null && value !== ''
+    );
+    const query = new URLSearchParams(filtered as [string, string][]).toString();
     const url = query ? `${endpoint}?${query}` : endpoint;
-    
-    return this.request<T>(url, {
-      method: 'GET',
-    });
+
+    return this.request<T>(url, { method: 'GET' });
   }
 
-  // POST request
   async post<T = any>(endpoint: string, data: any = {}): Promise<T> {
-    return this.request<T>(endpoint, {
-      method: 'POST',
-      body: JSON.stringify(data),
-    });
+    return this.request<T>(endpoint, { method: 'POST', body: JSON.stringify(data) });
   }
 
-  // PUT request
   async put<T = any>(endpoint: string, data: any = {}): Promise<T> {
-    return this.request<T>(endpoint, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    });
+    return this.request<T>(endpoint, { method: 'PUT', body: JSON.stringify(data) });
   }
 
-  // DELETE request
   async delete<T = any>(endpoint: string, data: any = {}): Promise<T> {
-    return this.request<T>(endpoint, {
-      method: 'DELETE',
-      body: JSON.stringify(data),
-    });
+    return this.request<T>(endpoint, { method: 'DELETE', body: JSON.stringify(data) });
   }
 
-  // Authentication methods
+  // -------------------------------------------------------------------------
+  // Authentication
+  // -------------------------------------------------------------------------
+
   async login(email: string, password: string): Promise<LoginResponse> {
-    const response = await this.post<LoginResponse>('/api/auth/login', {
-      email,
-      password,
-    });
-
-    if (response.token) {
-      this.setToken(response.token);
-    }
-
-    return response;
+    // The response also sets the session cookie, which is what actually
+    // authenticates subsequent requests.
+    return this.post<LoginResponse>('/api/auth/login', { email, password });
   }
 
   async register(userData: any): Promise<LoginResponse> {
-    const response = await this.post<LoginResponse>('/api/auth/register', userData);
-
-    if (response.token) {
-      this.setToken(response.token);
-    }
-
-    return response;
+    return this.post<LoginResponse>('/api/auth/register', userData);
   }
 
   async logout(): Promise<void> {
-    try {
-      await this.post('/api/auth/logout');
-    } catch (error) {
-      console.error('Logout error:', error);
-    } finally {
-      this.setToken(null);
-    }
+    await this.post('/api/auth/logout');
   }
 
   async getCurrentUser(): Promise<ApiResponse> {
@@ -160,12 +121,13 @@ class ApiClient {
   }
 
   async changePassword(currentPassword: string, newPassword: string): Promise<ApiResponse> {
-    return this.put('/api/auth/change-password', {
-      currentPassword,
-      newPassword,
-    });
+    return this.put('/api/auth/change-password', { currentPassword, newPassword });
   }
-  // Emergency methods
+
+  // -------------------------------------------------------------------------
+  // Emergency and complaints
+  // -------------------------------------------------------------------------
+
   async createEmergencyReport(reportData: any): Promise<ApiResponse> {
     return this.post('/api/emergency/report', reportData);
   }
@@ -178,19 +140,6 @@ class ApiClient {
     return this.get('/api/emergency/my-reports');
   }
 
-  async getEmergencyReport(id: string | number): Promise<ApiResponse> {
-    return this.get(`/api/emergency/reports/${id}`);
-  }
-
-  async updateEmergencyStatus(id: string | number, statusData: any): Promise<ApiResponse> {
-    return this.put(`/api/emergency/reports/${id}/status`, statusData);
-  }
-
-  async getEmergencyStats(): Promise<ApiResponse> {
-    return this.get('/api/emergency/stats');
-  }
-
-  // Complaint methods
   async createComplaint(complaintData: any): Promise<ApiResponse> {
     return this.post('/api/complaint/report', complaintData);
   }
@@ -199,107 +148,75 @@ class ApiClient {
     return this.get('/api/complaint/reports', params);
   }
 
-  async getMyComplaints(): Promise<ApiResponse> {
-    return this.get('/api/complaint/my-reports');
+  // -------------------------------------------------------------------------
+  // Safety features
+  // -------------------------------------------------------------------------
+
+  async getCheckins(): Promise<ApiResponse> {
+    return this.get('/api/checkin');
   }
 
-  async getComplaint(id: string | number): Promise<ApiResponse> {
-    return this.get(`/api/complaint/reports/${id}`);
+  async createCheckin(checkin: any): Promise<ApiResponse> {
+    return this.post('/api/checkin', checkin);
   }
 
-  async updateComplaintStatus(id: string | number, statusData: any): Promise<ApiResponse> {
-    return this.put(`/api/complaint/reports/${id}/status`, statusData);
-  }
-
-  async getComplaintCategories(): Promise<ApiResponse> {
-    return this.get('/api/complaint/categories');
-  }
-
-  async getComplaintStats(): Promise<ApiResponse> {
-    return this.get('/api/complaint/stats');
-  }
-
-  // User methods
-  async getNotifications(params: Record<string, any> = {}): Promise<ApiResponse> {
-    return this.get('/api/user/notifications', params);
-  }
-
-  async markNotificationRead(id: string | number): Promise<ApiResponse> {
-    return this.put(`/api/user/notifications/${id}/read`);
-  }
-
-  async markAllNotificationsRead(): Promise<ApiResponse> {
-    return this.put('/api/user/notifications/read-all');
-  }
-
-  async getDashboardData(): Promise<ApiResponse> {
-    return this.get('/api/user/dashboard');
-  }
-
-  async submitVerification(documents: any): Promise<ApiResponse> {
-    return this.post('/api/user/verification', documents);
+  async updateCheckin(id: number, status: string, sosTriggered = false): Promise<ApiResponse> {
+    return this.put('/api/checkin', { id, status, sosTriggered });
   }
 
   async getEmergencyContacts(): Promise<ApiResponse> {
-    return this.get('/api/user/emergency-contacts');
+    return this.get('/api/contacts');
   }
 
-  async getUserActivity(params: Record<string, any> = {}): Promise<ApiResponse> {
-    return this.get('/api/user/activity', params);
+  async getSafetyResources(params: Record<string, any> = {}): Promise<ApiResponse> {
+    return this.get('/api/safety/resources', params);
   }
 
-  async deleteAccount(reason: string): Promise<ApiResponse> {
-    return this.delete('/api/user/account', { reason });
+  async getDiscussionCategories(): Promise<ApiResponse> {
+    return this.get('/api/discussion/categories');
   }
 
-  // Admin methods
+  async getDiscussionPosts(params: Record<string, any> = {}): Promise<ApiResponse> {
+    return this.get('/api/discussion/posts', params);
+  }
+
+  async createDiscussionPost(post: any): Promise<ApiResponse> {
+    return this.post('/api/discussion/posts', post);
+  }
+
+  async getLostAndFound(params: Record<string, any> = {}): Promise<ApiResponse> {
+    return this.get('/api/lost-and-found', params);
+  }
+
+  async createLostAndFoundItem(item: any): Promise<ApiResponse> {
+    return this.post('/api/lost-and-found', item);
+  }
+
+  async updateLostAndFoundItem(id: number, status: string): Promise<ApiResponse> {
+    return this.put('/api/lost-and-found', { id, status });
+  }
+
+  async getBadges(userId?: number): Promise<ApiResponse> {
+    return this.get('/api/badges', userId ? { userId } : {});
+  }
+
+  // -------------------------------------------------------------------------
+  // Admin
+  // -------------------------------------------------------------------------
+
   async getAdminDashboard(): Promise<ApiResponse> {
     return this.get('/api/admin/dashboard');
   }
 
-  async getUsers(params: Record<string, any> = {}): Promise<ApiResponse> {
-    return this.get('/api/admin/users', params);
+  async getModerationQueue(params: Record<string, any> = {}): Promise<ApiResponse> {
+    return this.get('/api/admin/moderation', params);
   }
 
-  async getUser(id: string | number): Promise<ApiResponse> {
-    return this.get(`/api/admin/users/${id}`);
-  }
-
-  async verifyUser(id: string | number, verified: boolean, notes?: string): Promise<ApiResponse> {
-    return this.put(`/api/admin/users/${id}/verify`, { verified, notes });
-  }
-
-  async createAdmin(adminData: any): Promise<ApiResponse> {
-    return this.post('/api/admin/users/admin', adminData);
-  }
-
-  async getSystemSettings(): Promise<ApiResponse> {
-    return this.get('/api/admin/settings');
-  }
-
-  async updateSystemSetting(key: string, value: any): Promise<ApiResponse> {
-    return this.put(`/api/admin/settings/${key}`, { value });
-  }
-
-  async getAuditLogs(params: Record<string, any> = {}): Promise<ApiResponse> {
-    return this.get('/api/admin/audit-logs', params);
-  }
-
-  async getAdminEmergencyContacts(): Promise<ApiResponse> {
-    return this.get('/api/admin/emergency-contacts');
-  }
-
-  async updateEmergencyContact(id: string | number, contactData: any): Promise<ApiResponse> {
-    return this.put(`/api/admin/emergency-contacts/${id}`, contactData);
-  }
-
-  // Health check
   async healthCheck(): Promise<ApiResponse> {
     return this.get('/api/health');
   }
 }
 
-// Create and export a singleton instance
 const apiClient = new ApiClient();
 
 export default apiClient;

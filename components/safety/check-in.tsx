@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Clock, MapPin, AlertTriangle, CheckCircle, Phone, Plus, Calendar } from 'lucide-react';
+import { toast } from 'sonner';
+import apiClient from '@/lib/api-client';
 
 interface SafetyCheckin {
   id: number;
@@ -48,6 +50,7 @@ export default function SafetyCheckin() {
   const [checkins, setCheckins] = useState<SafetyCheckin[]>([]);
   const [contacts, setContacts] = useState<EmergencyContact[]>([]);
   const [loading, setLoading] = useState(true);
+  const [requiresSignIn, setRequiresSignIn] = useState(false);
   const [showNewCheckinDialog, setShowNewCheckinDialog] = useState(false);
   const [newCheckin, setNewCheckin] = useState({
     expectedArrivalTime: '',
@@ -61,17 +64,20 @@ export default function SafetyCheckin() {
     fetchContacts();
   }, []);
 
+  // The server scopes every check-in to the signed-in user, so no user id is
+  // sent from here. A 401 means the visitor is not signed in.
   const fetchCheckins = async () => {
     try {
-      // In a real app, you'd get the current user's ID from auth context
-      const userId = 1; // Placeholder
-      const response = await fetch(`/api/checkin?userId=${userId}`);
-      const result = await response.json();
-      if (result.success) {
-        setCheckins(result.data);
+      const result = await apiClient.getCheckins();
+      setCheckins(result.data || []);
+      setRequiresSignIn(false);
+    } catch (error: any) {
+      if (error?.status === 401) {
+        setRequiresSignIn(true);
+      } else {
+        console.error('Error fetching checkins:', error);
+        toast.error('Could not load your check-ins.');
       }
-    } catch (error) {
-      console.error('Error fetching checkins:', error);
     } finally {
       setLoading(false);
     }
@@ -79,11 +85,8 @@ export default function SafetyCheckin() {
 
   const fetchContacts = async () => {
     try {
-      const response = await fetch('/api/contacts');
-      const result = await response.json();
-      if (result.success) {
-        setContacts(result.data);
-      }
+      const result = await apiClient.getEmergencyContacts();
+      setContacts(result.data || []);
     } catch (error) {
       console.error('Error fetching contacts:', error);
     }
@@ -91,87 +94,59 @@ export default function SafetyCheckin() {
 
   const handleCreateCheckin = async () => {
     if (!newCheckin.expectedArrivalTime || !newCheckin.location) {
-      alert('Please fill in the required fields');
+      toast.error('Please fill in the required fields');
       return;
     }
 
     try {
-      const userId = 1; // Placeholder - get from auth context
-      const response = await fetch('/api/checkin', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          ...newCheckin
-        }),
+      await apiClient.createCheckin({
+        expectedArrivalTime: newCheckin.expectedArrivalTime,
+        location: newCheckin.location,
+        emergencyContactId: newCheckin.emergencyContactId
+          ? Number(newCheckin.emergencyContactId)
+          : undefined,
+        notes: newCheckin.notes || undefined,
       });
 
-      const result = await response.json();
-      if (result.success) {
-        setNewCheckin({
-          expectedArrivalTime: '',
-          location: '',
-          emergencyContactId: '',
-          notes: ''
-        });
-        setShowNewCheckinDialog(false);
-        fetchCheckins(); // Refresh the list
-        alert('Safety check-in created successfully!');
-      } else {
-        alert('Failed to create check-in');
-      }
-    } catch (error) {
+      setNewCheckin({
+        expectedArrivalTime: '',
+        location: '',
+        emergencyContactId: '',
+        notes: '',
+      });
+      setShowNewCheckinDialog(false);
+      fetchCheckins();
+      toast.success('Safety check-in created');
+    } catch (error: any) {
       console.error('Error creating checkin:', error);
-      alert('Failed to create check-in');
+      toast.error(error?.message || 'Failed to create check-in');
     }
   };
 
   const handleUpdateCheckin = async (id: number, status: string) => {
     try {
-      const response = await fetch('/api/checkin', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ id, status }),
-      });
-
-      const result = await response.json();
-      if (result.success) {
-        fetchCheckins(); // Refresh the list
-      } else {
-        alert('Failed to update check-in');
-      }
-    } catch (error) {
+      await apiClient.updateCheckin(id, status);
+      fetchCheckins();
+    } catch (error: any) {
       console.error('Error updating checkin:', error);
-      alert('Failed to update check-in');
+      toast.error(error?.message || 'Failed to update check-in');
     }
   };
 
   const handleSOSAlert = async (id: number) => {
-    if (confirm('This will trigger an SOS alert. Are you sure?')) {
-      try {
-        const response = await fetch('/api/checkin', {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ id, status: 'alerted', sosTriggered: true }),
-        });
+    if (!confirm('This will alert campus security. Are you sure?')) return;
 
-        const result = await response.json();
-        if (result.success) {
-          fetchCheckins();
-          alert('SOS alert has been sent to emergency contacts!');
-        } else {
-          alert('Failed to send SOS alert');
-        }
-      } catch (error) {
-        console.error('Error sending SOS alert:', error);
-        alert('Failed to send SOS alert');
-      }
+    try {
+      await apiClient.updateCheckin(id, 'alerted', true);
+      fetchCheckins();
+      // Deliberately specific: the alert reaches responders inside the app,
+      // it does not place a call or send a text message.
+      toast.success('SOS raised. Campus security has been notified in the app.');
+    } catch (error: any) {
+      console.error('Error sending SOS alert:', error);
+      toast.error(
+        error?.message || 'Could not raise the SOS. Call campus security directly.'
+      );
     }
   };
 
@@ -193,6 +168,23 @@ export default function SafetyCheckin() {
           </Card>
         ))}
       </div>
+    );
+  }
+
+  // Check-ins are personal data, so there is nothing to show a visitor who
+  // is not signed in.
+  if (requiresSignIn) {
+    return (
+      <Card>
+        <CardContent className="text-center py-12">
+          <Clock className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Sign in to use safety check-ins</h2>
+          <p className="text-gray-500 max-w-md mx-auto">
+            A check-in records where you are heading and when you expect to arrive, so campus
+            security can act if you do not check in. Sign in to create one.
+          </p>
+        </CardContent>
+      </Card>
     );
   }
 

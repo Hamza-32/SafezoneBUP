@@ -1,12 +1,26 @@
+export const dynamic = 'force-dynamic';
+
 // Database setup API endpoint - POST /api/admin/setup-database
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';
-import { 
+import {
   successResponse,
-  errorResponse
+  errorResponse,
+  requireAdmin,
+  logAction
 } from '@/lib/api-middleware';
+import { enforceRateLimit } from '@/lib/rate-limit';
 
 export async function POST(request: NextRequest) {
+  // Creating schema and seeding default rows (including the campus emergency
+  // hotline numbers) is an administrator action. First-time bootstrap, before
+  // any admin account exists, is done from the CLI with `npm run db:setup`.
+  const auth = await requireAdmin(request);
+  if (!auth.ok) return auth.response;
+
+  const limited = await enforceRateLimit(request, 'setup-database', 3, 60 * 60);
+  if (limited) return limited;
+
   try {
     console.log('Setting up safety features database tables...');
 
@@ -240,6 +254,8 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Database setup completed successfully!');
+
+    await logAction(auth.user.id, 'SETUP_DATABASE', 'safety_resources', null, {}, request);
 
     return successResponse({
       message: 'Safety features database setup completed successfully',

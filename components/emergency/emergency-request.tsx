@@ -55,16 +55,87 @@ export default function EmergencyRequest({ onNavigate }: EmergencyRequestProps) 
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const [referenceId, setReferenceId] = useState<string | null>(null)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+
+  /**
+   * Best-effort coordinates for the responder.
+   *
+   * Never blocks the report: if the browser denies permission or takes too
+   * long, the report still goes out with the typed location only.
+   */
+  const captureCoordinates = (): Promise<{ latitude: number; longitude: number } | null> => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      return Promise.resolve(null)
+    }
+
+    return new Promise((resolve) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) =>
+          resolve({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          }),
+        () => resolve(null),
+        { timeout: 5000, maximumAge: 60000 }
+      )
+    })
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsSubmitting(true)
+    setSubmitError(null)
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false)
+    const typeLabel =
+      emergencyTypes.find((type) => type.id === formData.emergencyType)?.label ?? "Emergency"
+
+    // The report schema has no dedicated fields for these, so they are kept
+    // with the description where a responder will actually read them.
+    const contextLines = [
+      formData.isForSomeoneElse ? "Reported on behalf of someone else." : null,
+      formData.reporterName ? `Reporter: ${formData.reporterName}` : null,
+      formData.contactNumber ? `Contact number: ${formData.contactNumber}` : null,
+      formData.studentId ? `Student ID: ${formData.studentId}` : null,
+    ].filter(Boolean)
+
+    const description = [formData.description.trim(), ...contextLines].filter(Boolean).join("\n")
+
+    try {
+      const coordinates = await captureCoordinates()
+
+      const response = await fetch("/api/emergency/report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: `${typeLabel} emergency${formData.location ? ` at ${formData.location}` : ""}`,
+          description: description || `${typeLabel} emergency reported.`,
+          category: formData.emergencyType,
+          location: formData.location,
+          latitude: coordinates?.latitude,
+          longitude: coordinates?.longitude,
+          isAnonymous: formData.isAnonymous,
+        }),
+      })
+
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || "Your report could not be submitted.")
+      }
+
+      setReferenceId(result.data?.referenceId ?? null)
       setIsSubmitted(true)
-    }, 2000)
+    } catch (error: any) {
+      // Never show a success screen for a report that did not reach the
+      // server: someone in danger would believe help is on the way.
+      setSubmitError(
+        error?.message ||
+          "Your report could not be submitted. Please call campus security directly."
+      )
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   if (isSubmitted) {
@@ -82,12 +153,15 @@ export default function EmergencyRequest({ onNavigate }: EmergencyRequestProps) 
                 Your emergency request has been submitted successfully. Campus security has been notified and will respond immediately.
               </p>
               
-              <div className="p-4 rounded-xl bg-muted/50 mb-6">
-                <p className="text-sm text-muted-foreground mb-1">Reference ID</p>
-                <p className="font-mono text-lg font-bold text-foreground">
-                  EMG-{Date.now().toString().slice(-6)}
-                </p>
-              </div>
+              {referenceId && (
+                <div className="p-4 rounded-xl bg-muted/50 mb-6">
+                  <p className="text-sm text-muted-foreground mb-1">Reference ID</p>
+                  <p className="font-mono text-lg font-bold text-foreground">{referenceId}</p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Quote this reference when following up.
+                  </p>
+                </div>
+              )}
 
               <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 mb-6">
                 <Clock className="h-4 w-4 text-blue-600" />
@@ -104,6 +178,8 @@ export default function EmergencyRequest({ onNavigate }: EmergencyRequestProps) 
                 <Button 
                   onClick={() => {
                     setIsSubmitted(false)
+                    setReferenceId(null)
+                    setSubmitError(null)
                     setFormData({
                       emergencyType: "",
                       location: "",
@@ -293,7 +369,9 @@ export default function EmergencyRequest({ onNavigate }: EmergencyRequestProps) 
                       <Label htmlFor="isForSomeoneElse" className="cursor-pointer font-medium">
                         Reporting for someone else
                       </Label>
-                      <p className="text-xs text-muted-foreground">You're not the person in emergency</p>
+                      <p className="text-xs text-muted-foreground">
+                        You are not the person in the emergency
+                      </p>
                     </div>
                   </div>
                   <Switch
@@ -362,10 +440,33 @@ export default function EmergencyRequest({ onNavigate }: EmergencyRequestProps) 
                 </div>
               )}
 
+              {/* Submission failure. Shown in place of a success screen so
+                  nobody is told help is coming when the report never sent. */}
+              {submitError && (
+                <div
+                  role="alert"
+                  className="p-4 rounded-xl border-2 border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-900/20"
+                >
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="font-semibold text-red-800 dark:text-red-200">
+                        Report not submitted
+                      </p>
+                      <p className="text-sm text-red-700 dark:text-red-300 mt-1">{submitError}</p>
+                      <p className="text-sm text-red-700 dark:text-red-300 mt-2">
+                        If this is an active emergency, call campus security directly instead of
+                        retrying.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Submit Button */}
               <Button
                 type="submit"
-                className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 shadow-md hover:shadow-lg transition-all"
+                className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/90 emergency-pulse shadow-lg shadow-primary/25"
                 disabled={isSubmitting || !formData.emergencyType}
               >
                 {isSubmitting ? (

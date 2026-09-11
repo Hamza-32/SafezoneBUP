@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';
 import { successResponse, errorResponse } from '@/lib/api-middleware';
@@ -15,7 +17,7 @@ export async function GET(request: NextRequest) {
     const uptimeMinutes = Math.floor((uptime % 3600) / 60);
     const uptimeSeconds = Math.floor(uptime % 60);
 
-    return successResponse('API is healthy', {
+    return successResponse({
       status: 'healthy',
       timestamp: new Date().toISOString(),
       database: {
@@ -31,19 +33,19 @@ export async function GET(request: NextRequest) {
         complaint: '/api/complaint/*',
         admin: '/api/admin/*'
       }
-    });
+    }, 'API is healthy');
 
   } catch (error) {
+    // The underlying error is logged but never returned: a database error
+    // message names hosts, users and table structure.
     console.error('Health check failed:', error);
-    
+
     return errorResponse('API is unhealthy', 503, {
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
       database: {
-        status: 'disconnected',
-        error: error instanceof Error ? error.message : 'Unknown error'
-      },
-      environment: process.env.NODE_ENV || 'development'
+        status: 'disconnected'
+      }
     });
   }
 }

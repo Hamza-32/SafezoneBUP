@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // Get current user endpoint - GET /api/auth/me
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';

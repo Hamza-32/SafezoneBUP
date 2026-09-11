@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic';
+
 // Admin dashboard endpoint - GET /api/admin/dashboard
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';

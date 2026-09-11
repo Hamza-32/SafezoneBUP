@@ -11,10 +11,11 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 
 interface SignupProps {
+  onSignup: (role: "admin" | "student", userData: any) => void | Promise<void>
   onNavigate: (page: string) => void
 }
 
-export default function Signup({ onNavigate }: SignupProps) {
+export default function Signup({ onSignup, onNavigate }: SignupProps) {
   const [showPassword, setShowPassword] = useState(false)
   const [formData, setFormData] = useState({
     firstName: "",
@@ -33,11 +34,18 @@ export default function Signup({ onNavigate }: SignupProps) {
       alert("Passwords do not match")
       return
     }
-    setIsLoading(true)
-    setTimeout(() => {
+    try {
+      setIsLoading(true)
+      await onSignup(formData.role as "admin" | "student", {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        studentId: formData.role === "student" ? formData.studentId : undefined,
+        password: formData.password,
+      })
+    } finally {
       setIsLoading(false)
-      onNavigate("login")
-    }, 1500)
+    }
   }
 
   return (
@@ -152,6 +160,18 @@ export default function Signup({ onNavigate }: SignupProps) {
               </button>
             </div>
 
+            {/* Staff accounts are provisioned by an administrator. Self-service
+                signup always creates a student account, so saying otherwise
+                here would mislead. */}
+            {formData.role === "admin" && (
+              <div className="p-3 rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800">
+                <p className="text-sm text-amber-800 dark:text-amber-200">
+                  Staff and security accounts cannot be created here. Ask an existing
+                  administrator to provision your account, then sign in.
+                </p>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
@@ -252,7 +272,7 @@ export default function Signup({ onNavigate }: SignupProps) {
               <Button
                 type="submit"
                 className="w-full h-11 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-lg shadow-primary/25"
-                disabled={isLoading}
+                disabled={isLoading || formData.role === "admin"}
               >
                 {isLoading ? (
                   <div className="flex items-center gap-2">
