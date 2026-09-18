@@ -18,29 +18,60 @@ const DEV_ONLY_SECRET = 'insecure-development-only-key-do-not-use-in-production'
 
 const MIN_SECRET_LENGTH = 32;
 
+/**
+ * Values that look like a secret but are published in this repository or in
+ * common templates, so they protect nothing.
+ *
+ * A length check alone is not enough: the placeholder that ships in
+ * .env.example is 41 characters, and was found in a real .env file where it
+ * had simply never been replaced. Anyone reading the repo could have forged
+ * a session token for any account.
+ */
+const PLACEHOLDER_SECRET_PATTERNS = [
+  /change[-_ ]?(me|in[-_ ]?production|this)/i,
+  /your[-_ ]?(jwt[-_ ]?)?secret/i,
+  /secret[-_ ]?key[-_ ]?here/i,
+  /^(changeme|secret|password|test|example|placeholder)$/i,
+  /insecure[-_ ]?development/i,
+];
+
+function looksLikePlaceholder(secret: string): boolean {
+  return PLACEHOLDER_SECRET_PATTERNS.some((pattern) => pattern.test(secret));
+}
+
 let warnedAboutDevSecret = false;
 
 function resolveJwtSecret(): string {
   const secret = process.env.JWT_SECRET;
   const isProduction = process.env.NODE_ENV === 'production';
 
-  if (secret && secret.length >= MIN_SECRET_LENGTH) {
+  const tooShort = !secret || secret.length < MIN_SECRET_LENGTH;
+  const isPlaceholder = Boolean(secret) && looksLikePlaceholder(secret as string);
+
+  if (secret && !tooShort && !isPlaceholder) {
     return secret;
   }
 
   if (isProduction) {
     throw new Error(
-      `JWT_SECRET is missing or too short. Set it to a random string of at least ${MIN_SECRET_LENGTH} characters, ` +
-        'for example the output of: node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'hex\'))"'
+      isPlaceholder
+        ? 'JWT_SECRET is still a template placeholder. That value is published in this repository, ' +
+          'so anyone could forge a session for any account. Replace it with the output of: npm run gen:secret'
+        : `JWT_SECRET is missing or too short. Set it to a random string of at least ${MIN_SECRET_LENGTH} characters, ` +
+          'for example the output of: npm run gen:secret'
     );
   }
 
   if (!warnedAboutDevSecret) {
     warnedAboutDevSecret = true;
+
     console.warn(
-      secret
-        ? `⚠️  JWT_SECRET is shorter than ${MIN_SECRET_LENGTH} characters. Using the development key instead. This will refuse to start in production.`
-        : '⚠️  JWT_SECRET is not set. Using an insecure development key. Set JWT_SECRET before deploying.'
+      isPlaceholder
+        ? '⚠️  JWT_SECRET is still a template placeholder, which is published in this repository. ' +
+          'Using the development key instead. This will refuse to start in production.'
+        : secret
+          ? `⚠️  JWT_SECRET is shorter than ${MIN_SECRET_LENGTH} characters. Using the development key instead. This will refuse to start in production.`
+          : '⚠️  JWT_SECRET is not set. Using an insecure development key. Set JWT_SECRET before deploying.'
     );
   }
 

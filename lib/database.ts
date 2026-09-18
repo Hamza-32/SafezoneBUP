@@ -1,10 +1,16 @@
 import { Pool, types as pgTypes, type PoolClient } from 'pg';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 import { restoreRowCase } from './database-columns';
 
 // Load environment variables
-dotenv.config({ quiet: true });
+// .env.local is loaded first on purpose. dotenv never overwrites a variable
+// that is already set, so whichever file is read first wins. Loading .env
+// first meant a stale value there silently beat the real one in .env.local,
+// which is the opposite of how Next.js itself resolves them.
 dotenv.config({ path: '.env.local', quiet: true });
+dotenv.config({ quiet: true });
 
 // ---------------------------------------------------------------------------
 // Value parsing
@@ -38,15 +44,21 @@ const DEFAULT_CONNECTION_LIMIT = process.env.VERCEL ? 2 : 10;
 /**
  * TLS settings.
  *
- * Supabase requires an encrypted connection. Certificates for its pooler
- * hostnames are signed by a public authority, so ordinary verification
- * works and is the default here.
+ * Supabase requires an encrypted connection, and its connection pooler
+ * presents a certificate signed by Supabase's own authority rather than one
+ * Node already trusts. Verifying it therefore needs that authority's
+ * certificate, which the dashboard offers under Database, SSL Configuration.
  *
- * DB_SSL_CA holds the PEM contents of a CA certificate, for a provider that
- * uses a private authority. DB_SSL_REJECT_UNAUTHORIZED=false skips
- * verification entirely: that leaves the connection encrypted but not
- * authenticated, so it is only for diagnosing a certificate problem, never a
- * permanent setting.
+ * Supply it either way round:
+ *   DB_SSL_CA_FILE  path to the downloaded .crt file (easiest locally)
+ *   DB_SSL_CA       the PEM contents themselves (for a hosting dashboard,
+ *                   which cannot hold real newlines, so \n escapes are
+ *                   accepted)
+ *
+ * DB_SSL_REJECT_UNAUTHORIZED=false skips verification entirely. The traffic
+ * stays encrypted but the server is no longer authenticated, so it only
+ * defends against passive eavesdropping and not against an impostor. Use it
+ * to confirm a certificate problem, never as a permanent setting.
  */
 function resolveSsl(): false | { rejectUnauthorized: boolean; ca?: string } {
   const host = process.env.DB_HOST || '';
@@ -68,11 +80,30 @@ function resolveSsl(): false | { rejectUnauthorized: boolean; ca?: string } {
     );
   }
 
-  // Dashboards cannot hold real newlines, so accept the escaped form a
-  // pasted certificate usually arrives in.
-  const ca = process.env.DB_SSL_CA?.replace(/\\n/g, '\n');
+  const ca = readCaCertificate();
 
   return { rejectUnauthorized, ...(ca ? { ca } : {}) };
+}
+
+function readCaCertificate(): string | undefined {
+  const file = process.env.DB_SSL_CA_FILE;
+
+  if (file) {
+    try {
+      // Relative paths resolve against the project root, which is where the
+      // process is started from.
+      return fs.readFileSync(path.resolve(file), 'utf8');
+    } catch (error) {
+      console.error(
+        `❌ DB_SSL_CA_FILE is set to "${file}" but it could not be read: ` +
+          (error instanceof Error ? error.message : String(error))
+      );
+      // Fall through: the connection will fail with a certificate error,
+      // which is clearer than silently connecting unverified.
+    }
+  }
+
+  return process.env.DB_SSL_CA?.replace(/\\n/g, '\n');
 }
 
 function buildPool(): Pool {

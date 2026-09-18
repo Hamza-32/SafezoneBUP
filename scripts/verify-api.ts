@@ -21,8 +21,12 @@
 
 import dotenv from 'dotenv';
 
-dotenv.config({ quiet: true });
+// .env.local is loaded first on purpose. dotenv never overwrites a variable
+// that is already set, so whichever file is read first wins. Loading .env
+// first meant a stale value there silently beat the real one in .env.local,
+// which is the opposite of how Next.js itself resolves them.
 dotenv.config({ path: '.env.local', quiet: true });
+dotenv.config({ quiet: true });
 
 import crypto from 'crypto';
 import { Database } from '../lib/database';

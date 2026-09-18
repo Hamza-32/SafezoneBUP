@@ -6,21 +6,29 @@
  *     repository's seed data. Run this against production before opening the
  *     app to the internet.
  *
- *   npm run admin:password -- --email=admin@bup.edu.bd --generate
+ *   npx tsx scripts/admin-password.ts set admin@bup.edu.bd --generate
  *     Sets a strong random password and prints it once.
  *
- *   npm run admin:password -- --email=admin@bup.edu.bd --password="..."
+ *   npx tsx scripts/admin-password.ts set admin@bup.edu.bd --password="..."
  *     Sets a specific password. It must satisfy the same policy the API
  *     enforces, so a weak one is rejected here too.
  *
- * Both commands read the DB_* variables, so check which database they point
- * at before running. The target is printed on every run.
+ * Use the npx form rather than `npm run ... --`: npm does not forward those
+ * flags on Windows, and the script would see no arguments at all.
+ *
+ * Both commands read the connection settings from the environment, so check
+ * which database they point at before running. The target is printed on
+ * every run.
  */
 
 import dotenv from 'dotenv';
 
-dotenv.config({ quiet: true });
+// .env.local is loaded first on purpose. dotenv never overwrites a variable
+// that is already set, so whichever file is read first wins. Loading .env
+// first meant a stale value there silently beat the real one in .env.local,
+// which is the opposite of how Next.js itself resolves them.
 dotenv.config({ path: '.env.local', quiet: true });
+dotenv.config({ quiet: true });
 
 import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
@@ -178,8 +186,17 @@ async function setPassword(args: Record<string, string | boolean>): Promise<numb
 
 async function main(): Promise<void> {
   const argv = process.argv.slice(2);
-  const command = argv.find((arg) => !arg.startsWith('--')) || 'audit';
+  const positional = argv.filter((arg) => !arg.startsWith('--'));
+  const command = positional[0] || 'audit';
   const args = parseArgs(argv);
+
+  // `npm run admin:password -- --email=x` does not forward the flags on every
+  // platform; npm drops them on Windows. So the address is also accepted as a
+  // plain second argument:
+  //   npx tsx scripts/admin-password.ts set someone@bup.edu.bd --generate
+  if (!args.email && positional[1]) {
+    args.email = positional[1];
+  }
 
   let exitCode = 1;
 

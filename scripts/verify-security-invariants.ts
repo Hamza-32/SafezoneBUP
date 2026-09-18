@@ -281,6 +281,60 @@ async function collectRouteFiles(fs: any, path: any, dir: string): Promise<strin
 // mistake here would corrupt every query in the application.
 // ---------------------------------------------------------------------------
 
+async function checkJwtSecretPolicy(): Promise<void> {
+  section('JWT secret policy');
+
+  const original = process.env.JWT_SECRET;
+  const originalEnv = process.env.NODE_ENV;
+
+  // Reload the module so each case re-evaluates the environment.
+  const load = async () => {
+    delete require.cache[require.resolve('../lib/api-middleware')];
+    return import('../lib/api-middleware');
+  };
+
+  const refusesInProduction = async (value: string | undefined, label: string) => {
+    if (value === undefined) delete process.env.JWT_SECRET;
+    else process.env.JWT_SECRET = value;
+
+    (process.env as any).NODE_ENV = 'production';
+
+    const { generateToken } = await load();
+
+    try {
+      generateToken(1);
+      check(`production refuses ${label}`, false, 'a token was signed');
+    } catch {
+      check(`production refuses ${label}`, true);
+    }
+  };
+
+  // These are the published template values. Long enough to pass a length
+  // check, worthless as secrets.
+  await refusesInProduction('your-jwt-secret-here-change-in-production', 'the .env.example placeholder');
+  await refusesInProduction('your-secret-key-here-change-in-production', 'the NextAuth placeholder');
+  await refusesInProduction('short', 'a short secret');
+  await refusesInProduction(undefined, 'a missing secret');
+
+  process.env.JWT_SECRET = 'a'.repeat(48);
+  (process.env as any).NODE_ENV = 'production';
+
+  const { generateToken } = await load();
+  let signed = false;
+  try {
+    generateToken(1);
+    signed = true;
+  } catch {
+    signed = false;
+  }
+
+  check('production accepts a real secret', signed);
+
+  if (original === undefined) delete process.env.JWT_SECRET;
+  else process.env.JWT_SECRET = original;
+  (process.env as any).NODE_ENV = originalEnv;
+}
+
 async function checkPlaceholderTranslation(): Promise<void> {
   const { toPositionalParams } = await import('../lib/database');
 
@@ -426,6 +480,7 @@ async function checkSharedRateLimiter(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 checkColumnCaseMap()
+  .then(checkJwtSecretPolicy)
   .then(checkPlaceholderTranslation)
   .then(checkSharedRateLimiter)
   .catch((error) => {

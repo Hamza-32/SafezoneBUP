@@ -115,14 +115,20 @@ npm run db:migrate
 npm run verify:api
 ```
 
-It refuses to write to a non-local server unless you pass `-- --yes`.
+It refuses to write to a non-local server unless you pass `--yes`. Because
+npm does not forward flags on Windows, run it as
+`npx tsx scripts/verify-api.ts --url=https://... --yes`.
 
 ## Rotating a password
 
 ```powershell
 npm run admin:audit
-npm run admin:password -- --email=admin@bup.edu.bd --generate
+npx tsx scripts/admin-password.ts set admin@bup.edu.bd --generate
 ```
+
+Use the `npx tsx` form for anything taking arguments. npm does not forward
+flags after `--` on Windows, so `npm run admin:password -- --email=...` reaches
+the script with no arguments at all.
 
 The generated password is printed once. Pass `--password="..."` to choose one
 instead; it has to satisfy the same policy the API enforces. Sessions issued
@@ -159,8 +165,25 @@ tokens yet.
    Linking a Vercel KV store to the project sets that pair for you. Outside
    Vercel, use `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
 
-   TLS is enabled automatically for any non-local host, so no SSL variable is
-   needed for Supabase.
+   Also required for Supabase:
+
+   | Variable    | Value                                                 |
+   | ----------- | ----------------------------------------------------- |
+   | `DB_SSL_CA` | The full contents of `supabase-ca.crt`, pasted inline |
+
+   TLS turns itself on for any non-local host, but Supabase's connection
+   pooler presents a certificate signed by Supabase's own authority, which
+   Node does not trust out of the box. Without this variable the connection
+   fails with `SELF_SIGNED_CERT_IN_CHAIN`.
+
+   Download it from Project Settings, Database, SSL Configuration, then paste
+   the whole file including the `BEGIN` and `END` lines. Vercel accepts
+   multi-line values. The certificate is public, so it is not a secret.
+
+   Locally the same certificate is supplied as a file path instead, through
+   `DB_SSL_CA_FILE`, because a path is easier to manage than pasted PEM. On
+   Vercel prefer `DB_SSL_CA`: a file next to the source is not reliably
+   included in a serverless function bundle.
 
    The app refuses to run in production without `JWT_SECRET` rather than
    falling back to a value committed in the repository. Changing the secret
@@ -178,8 +201,8 @@ tokens yet.
    putting the same `DATABASE_URL` in `.env.local` and running:
 
    ```powershell
-   npm run db:setup
-   npm run db:migrate -- --yes
+   npx tsx lib/database-init.ts setup --yes
+   npx tsx lib/database-init.ts migrate --yes
    ```
 
    The command prints which database it is about to change and refuses a
@@ -199,7 +222,7 @@ tokens yet.
    earlier with the old fixed password, rotate it:
 
    ```powershell
-   npm run admin:password -- --email=admin@bup.edu.bd --generate
+   npx tsx scripts/admin-password.ts set admin@bup.edu.bd --generate
    ```
 
    Do this before the app is reachable from the internet.
@@ -207,7 +230,7 @@ tokens yet.
 6. Confirm the deployment end to end:
 
    ```powershell
-   npm run verify:api -- --url=https://your-app.vercel.app --yes
+   npx tsx scripts/verify-api.ts --url=https://your-app.vercel.app --yes
    ```
 
    It creates two throwaway accounts, checks privilege escalation,
