@@ -429,6 +429,13 @@ async function checkSharedRateLimiter(): Promise<void> {
 
   const { enforceRateLimit, isSharedRateLimitEnabled } = await import('../lib/rate-limit');
 
+  // Clear every pair first. lib/database loads .env.local as a side effect of
+  // being imported, so once a real store is configured its variables are
+  // present here too — and KV_REST_API_* and UPSTASH_REDIS_REST_* both take
+  // precedence over the RATE_LIMIT_* pair this stub uses. Without this, the
+  // checks below would quietly run against the production store.
+  clearRateLimitEnv();
+
   process.env.RATE_LIMIT_REDIS_REST_URL = `http://127.0.0.1:${port}`;
   process.env.RATE_LIMIT_REDIS_REST_TOKEN = 'stub-token';
 
@@ -479,10 +486,151 @@ async function checkSharedRateLimiter(): Promise<void> {
 
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Rate-limit configuration validation.
+//
+// A store that is configured but unusable — a typo in the URL, a token still
+// on its template value — used to look exactly like no store at all: the
+// limiter fell back to memory and logged one line. In production that means
+// running on per-instance limits indefinitely without any signal.
+// ---------------------------------------------------------------------------
+
+const RATE_LIMIT_VARIABLES = [
+  'KV_REST_API_URL',
+  'KV_REST_API_TOKEN',
+  'UPSTASH_REDIS_REST_URL',
+  'UPSTASH_REDIS_REST_TOKEN',
+  'RATE_LIMIT_REDIS_REST_URL',
+  'RATE_LIMIT_REDIS_REST_TOKEN',
+  'RATE_LIMIT_REQUIRE_SHARED',
+];
+
+function clearRateLimitEnv(): void {
+  for (const name of RATE_LIMIT_VARIABLES) {
+    delete process.env[name];
+  }
+}
+
+async function checkRateLimitConfiguration(): Promise<void> {
+  const { describeRateLimitBackend, enforceRateLimit, resetRateLimits, resetRateLimitWarnings } =
+    await import('../lib/rate-limit');
+
+  section('Rate-limit configuration is validated');
+
+  clearRateLimitEnv();
+  check('no variables reads as absent, not as an error', describeRateLimitBackend().kind === 'absent');
+
+  const cases: Array<{ description: string; url?: string; token?: string; expect: RegExp }> = [
+    {
+      description: 'a URL without a token is reported as a mistake',
+      url: 'https://example.upstash.io',
+      expect: /TOKEN is not set/,
+    },
+    {
+      description: 'a token without a URL is reported as a mistake',
+      token: 'AX9sASQgY2I0',
+      expect: /URL is not set/,
+    },
+    {
+      description: 'a malformed URL is rejected',
+      url: 'example.upstash.io',
+      token: 'AX9sASQgY2I0',
+      expect: /not a valid URL/,
+    },
+    {
+      description: 'a remote endpoint over plain http is rejected',
+      url: 'http://example.upstash.io',
+      token: 'AX9sASQgY2I0',
+      expect: /must use https/,
+    },
+    {
+      description: 'a token still on its template value is rejected',
+      url: 'https://example.upstash.io',
+      token: 'your-token-here',
+      expect: /template placeholder/,
+    },
+    {
+      description: 'a whitespace-only token is rejected',
+      url: 'https://example.upstash.io',
+      token: '   ',
+      expect: /is empty/,
+    },
+  ];
+
+  for (const testCase of cases) {
+    clearRateLimitEnv();
+
+    if (testCase.url) process.env.RATE_LIMIT_REDIS_REST_URL = testCase.url;
+    if (testCase.token) process.env.RATE_LIMIT_REDIS_REST_TOKEN = testCase.token;
+
+    const backend = describeRateLimitBackend();
+    const reason = backend.kind === 'invalid' ? backend.reason : '';
+
+    check(testCase.description, backend.kind === 'invalid' && testCase.expect.test(reason), reason || backend.kind);
+  }
+
+  clearRateLimitEnv();
+  process.env.RATE_LIMIT_REDIS_REST_URL = 'https://example.upstash.io/';
+  process.env.RATE_LIMIT_REDIS_REST_TOKEN = 'AX9sASQgY2I0';
+
+  const valid = describeRateLimitBackend();
+  check('a well-formed pair is accepted', valid.kind === 'shared');
+  check(
+    'a trailing slash is trimmed, so the pipeline path is not doubled',
+    valid.kind === 'shared' && valid.url === 'https://example.upstash.io'
+  );
+
+  // Strict mode. Off by default on purpose: an outage at the store must not
+  // reject an emergency report.
+  section('Rate-limit strict mode');
+
+  const { NextRequest: StrictRequest } = await import('next/server');
+
+  const request = () =>
+    new StrictRequest('http://localhost/api/emergency/report', {
+      method: 'POST',
+      headers: { 'x-forwarded-for': '203.0.113.99' },
+    });
+
+  clearRateLimitEnv();
+  resetRateLimits();
+  resetRateLimitWarnings();
+
+  check(
+    'with no store and strict mode off, the request is allowed through',
+    (await enforceRateLimit(request(), 'strict-off', 5, 60)) === null
+  );
+
+  clearRateLimitEnv();
+  resetRateLimits();
+  resetRateLimitWarnings();
+  process.env.RATE_LIMIT_REQUIRE_SHARED = 'true';
+
+  const refused = await enforceRateLimit(request(), 'strict-on', 5, 60);
+
+  check('with strict mode on and no store, the request is refused', refused !== null);
+  check('the refusal is a 503, not a 429', refused?.status === 503);
+  check(
+    'the refusal carries Retry-After',
+    Number(refused?.headers.get('Retry-After')) > 0
+  );
+
+  const body = refused ? ((await refused.json()) as { error?: string }) : {};
+  check(
+    'the refusal does not name the store or its configuration',
+    typeof body.error === 'string' && !/redis|upstash|kv_rest|token/i.test(body.error)
+  );
+
+  clearRateLimitEnv();
+  resetRateLimits();
+  resetRateLimitWarnings();
+}
+
 checkColumnCaseMap()
   .then(checkJwtSecretPolicy)
   .then(checkPlaceholderTranslation)
   .then(checkSharedRateLimiter)
+  .then(checkRateLimitConfiguration)
   .catch((error) => {
     failures += 1;
     console.error(`  FAIL  asynchronous checks threw: ${error?.message ?? error}`);

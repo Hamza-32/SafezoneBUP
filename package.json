@@ -9,6 +9,7 @@
     "lint": "next lint",
     "verify:security": "tsx scripts/verify-security-invariants.ts",
     "verify:api": "tsx scripts/verify-api.ts",
+    "verify:ratelimit": "tsx scripts/verify-rate-limit.ts",
     "admin:audit": "tsx scripts/admin-password.ts audit",
     "admin:password": "tsx scripts/admin-password.ts set",
     "gen:secret": "node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\"",

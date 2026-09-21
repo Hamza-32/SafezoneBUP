@@ -2,12 +2,14 @@
 //
 // When a Redis REST endpoint is configured, counters are shared across every
 // function instance, which is what makes the limits real on a serverless host
-// such as Vercel. Set either pair of variables:
+// such as Vercel. Set any one of these pairs:
 //
-//   Vercel KV:  KV_REST_API_URL          + KV_REST_API_TOKEN
-//   Upstash:    UPSTASH_REDIS_REST_URL   + UPSTASH_REDIS_REST_TOKEN
+//   Vercel KV:  KV_REST_API_URL            + KV_REST_API_TOKEN
+//   Upstash:    UPSTASH_REDIS_REST_URL     + UPSTASH_REDIS_REST_TOKEN
+//   Explicit:   RATE_LIMIT_REDIS_REST_URL  + RATE_LIMIT_REDIS_REST_TOKEN
 //
-// Both speak the same HTTP protocol, so no client library is needed.
+// All three speak the same HTTP protocol, so no client library is needed.
+// Confirm a configured store actually works with: npm run verify:ratelimit
 //
 // Without those variables the counters fall back to process memory. That is
 // correct on a single long-lived server, but on Vercel each concurrent
@@ -15,6 +17,11 @@
 // effective limit is the configured limit times the number of live
 // instances. Treat the in-memory mode as spam friction, not a security
 // control.
+//
+// The fallback is deliberate rather than a hard failure: this application
+// carries emergency reports, and rejecting an SOS because a rate-limit store
+// is unreachable is worse than counting it per instance. Operators who would
+// rather refuse traffic can set RATE_LIMIT_REQUIRE_SHARED=true.
 
 import { NextRequest, NextResponse } from 'next/server';
 
@@ -25,40 +32,184 @@ import { NextRequest, NextResponse } from 'next/server';
 interface RedisRestConfig {
   url: string;
   token: string;
+  /** Which variable pair supplied the value, for error messages. */
+  source: string;
 }
 
-function resolveRedisConfig(): RedisRestConfig | null {
-  const url =
-    process.env.KV_REST_API_URL ||
-    process.env.UPSTASH_REDIS_REST_URL ||
-    process.env.RATE_LIMIT_REDIS_REST_URL;
+/**
+ * What the limiter is actually doing right now.
+ *
+ * `invalid` is kept separate from `absent` on purpose. Not configuring a
+ * store is a deliberate choice on a single-process server; configuring one
+ * with a typo is an operator mistake that would otherwise look identical at
+ * runtime, and would quietly leave production with per-instance limits.
+ */
+export type RateLimitBackend =
+  | { kind: 'shared'; source: string; url: string }
+  | { kind: 'absent' }
+  | { kind: 'invalid'; source: string; reason: string };
 
-  const token =
-    process.env.KV_REST_API_TOKEN ||
-    process.env.UPSTASH_REDIS_REST_TOKEN ||
-    process.env.RATE_LIMIT_REDIS_REST_TOKEN;
+const VARIABLE_PAIRS: Array<{ source: string; url: string; token: string }> = [
+  { source: 'KV_REST_API_*', url: 'KV_REST_API_URL', token: 'KV_REST_API_TOKEN' },
+  {
+    source: 'UPSTASH_REDIS_REST_*',
+    url: 'UPSTASH_REDIS_REST_URL',
+    token: 'UPSTASH_REDIS_REST_TOKEN',
+  },
+  {
+    source: 'RATE_LIMIT_REDIS_REST_*',
+    url: 'RATE_LIMIT_REDIS_REST_URL',
+    token: 'RATE_LIMIT_REDIS_REST_TOKEN',
+  },
+];
 
-  if (!url || !token) return null;
+/** Token values that are copied out of a template and never replaced. */
+const PLACEHOLDER_TOKEN_PATTERNS = [
+  /^your[-_ ]?(kv[-_ ]?|redis[-_ ]?|upstash[-_ ]?)?(rest[-_ ]?)?token([-_ ]?here)?$/i,
+  /^(changeme|token|example|placeholder|xxx+|\.\.\.)$/i,
+  /token[-_ ]?here/i,
+  /change[-_ ]?(me|in[-_ ]?production|this)/i,
+];
 
-  return { url: url.replace(/\/$/, ''), token };
+/**
+ * A REST endpoint must be a real absolute URL. Plain http is allowed only
+ * for loopback, which is how the offline checks point at a local stub; a
+ * remote endpoint over http would send the bearer token in clear text.
+ */
+function validateUrl(raw: string): string | null {
+  let parsed: URL;
+
+  try {
+    parsed = new URL(raw);
+  } catch {
+    return `is not a valid URL (got ${JSON.stringify(raw.slice(0, 60))})`;
+  }
+
+  if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+    return `must be an http(s) URL, not ${parsed.protocol}//`;
+  }
+
+  const loopback =
+    parsed.hostname === 'localhost' ||
+    parsed.hostname === '127.0.0.1' ||
+    parsed.hostname === '::1';
+
+  if (parsed.protocol === 'http:' && !loopback) {
+    return 'must use https, otherwise the access token is sent in clear text';
+  }
+
+  return null;
+}
+
+function validateToken(raw: string): string | null {
+  const token = raw.trim();
+
+  if (!token) return 'is empty';
+
+  if (PLACEHOLDER_TOKEN_PATTERNS.some((pattern) => pattern.test(token))) {
+    return 'is still a template placeholder';
+  }
+
+  return null;
+}
+
+/**
+ * Work out which backend is in use, validating anything that was configured.
+ *
+ * The first pair with either variable set wins, so a half-configured pair is
+ * reported as a mistake instead of being skipped in favour of the next one.
+ */
+export function describeRateLimitBackend(): RateLimitBackend {
+  for (const pair of VARIABLE_PAIRS) {
+    const url = process.env[pair.url];
+    const token = process.env[pair.token];
+
+    if (!url && !token) continue;
+
+    if (!url) return { kind: 'invalid', source: pair.source, reason: `${pair.url} is not set` };
+    if (!token) return { kind: 'invalid', source: pair.source, reason: `${pair.token} is not set` };
+
+    const urlProblem = validateUrl(url);
+    if (urlProblem) {
+      return { kind: 'invalid', source: pair.source, reason: `${pair.url} ${urlProblem}` };
+    }
+
+    const tokenProblem = validateToken(token);
+    if (tokenProblem) {
+      return { kind: 'invalid', source: pair.source, reason: `${pair.token} ${tokenProblem}` };
+    }
+
+    return { kind: 'shared', source: pair.source, url: url.replace(/\/$/, '') };
+  }
+
+  return { kind: 'absent' };
+}
+
+/**
+ * Turn an already-validated `shared` backend into the values the request
+ * path needs. Takes the backend rather than re-deriving it, so a request
+ * does not validate the environment twice.
+ */
+function resolveRedisConfig(backend: RateLimitBackend): RedisRestConfig | null {
+  if (backend.kind !== 'shared') return null;
+
+  const pair = VARIABLE_PAIRS.find((candidate) => candidate.source === backend.source);
+  if (!pair) return null;
+
+  return {
+    url: backend.url,
+    token: (process.env[pair.token] as string).trim(),
+    source: backend.source,
+  };
 }
 
 /** True when counters are shared across instances. */
 export function isSharedRateLimitEnabled(): boolean {
-  return resolveRedisConfig() !== null;
+  return describeRateLimitBackend().kind === 'shared';
 }
 
-let warnedAboutMemoryFallback = false;
+/**
+ * When set, a request is refused outright rather than counted in process
+ * memory if the shared store is missing or unreachable.
+ *
+ * Off by default, and that default is deliberate for this application: an
+ * outage at the rate-limit store would otherwise reject emergency reports.
+ * Weaker limits during an outage are the lesser harm. Turn it on only where
+ * rejecting traffic is preferable to counting it per instance.
+ */
+function strictModeEnabled(): boolean {
+  const raw = process.env.RATE_LIMIT_REQUIRE_SHARED;
+  return raw === '1' || /^(true|yes|on)$/i.test(raw ?? '');
+}
 
-function warnMemoryFallbackOnce(reason: string): void {
-  if (warnedAboutMemoryFallback) return;
-  warnedAboutMemoryFallback = true;
+/**
+ * Fallback warnings repeat rather than firing once per process.
+ *
+ * A single line at boot is lost in the log within minutes, which is how a
+ * production deployment can run for weeks on per-instance limits without
+ * anyone noticing. Repeating every few minutes keeps an ongoing outage
+ * visible without filling the log on every request.
+ */
+const WARN_INTERVAL_MS = 5 * 60_000;
+
+let lastWarnedAt = 0;
+
+function warnMemoryFallback(reason: string): void {
+  const now = Date.now();
+  if (lastWarnedAt && now - lastWarnedAt < WARN_INTERVAL_MS) return;
+  lastWarnedAt = now;
 
   console.warn(
     `⚠️  Rate limiting is using per-process memory (${reason}). ` +
       'On a serverless host the limits reset on cold starts and are not shared between ' +
-      'instances. Set KV_REST_API_URL and KV_REST_API_TOKEN to share them.'
+      'instances. Set KV_REST_API_URL and KV_REST_API_TOKEN to share them, then confirm ' +
+      'with: npm run verify:ratelimit'
   );
+}
+
+/** Reset the warning throttle. Intended for tests only. */
+export function resetRateLimitWarnings(): void {
+  lastWarnedAt = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -265,19 +416,43 @@ export async function enforceRateLimit(
   const identity = extraKey ? `${getClientIp(request)}:${extraKey}` : getClientIp(request);
   const key = `${bucket}:${identity}`;
 
-  const config = resolveRedisConfig();
+  const backend = describeRateLimitBackend();
   let result: RateLimitResult | null = null;
+  let degraded: string | null = null;
 
-  if (config) {
-    result = await rateLimitShared(config, key, limit, windowSeconds);
+  if (backend.kind === 'shared') {
+    const config = resolveRedisConfig(backend);
+    result = config ? await rateLimitShared(config, key, limit, windowSeconds) : null;
 
-    if (!result) {
-      warnMemoryFallbackOnce('the shared store is unreachable');
-    }
+    if (!result) degraded = 'the shared store is unreachable';
+  } else if (backend.kind === 'invalid') {
+    // Configured, but wrong. Worth saying exactly what is wrong, because the
+    // operator meant to have shared limits and currently does not.
+    degraded = `${backend.source} is misconfigured: ${backend.reason}`;
   } else {
-    warnMemoryFallbackOnce('no Redis REST endpoint is configured');
+    degraded = 'no Redis REST endpoint is configured';
   }
 
+  if (degraded) {
+    warnMemoryFallback(degraded);
+
+    if (strictModeEnabled()) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Rate limiting is temporarily unavailable. Please try again shortly.',
+        },
+        {
+          status: 503,
+          headers: { 'Retry-After': '30' },
+        }
+      );
+    }
+
+  }
+
+  // Only reachable when the shared store was unavailable and strict mode is
+  // off, so the counters are per process for this request.
   if (!result) {
     result = rateLimit(key, limit, windowSeconds);
   }

@@ -102,6 +102,7 @@ After that, an administrator can create further staff accounts by calling
 | ------------------------- | ------------------------------------------------------------- |
 | `npm run verify:security` | Authorization and validation checks. Needs no database.       |
 | `npm run verify:api`      | End-to-end checks against a running server and real database. |
+| `npm run verify:ratelimit`| Proves the configured rate-limit store is reachable and shared.|
 | `npm run admin:audit`     | Finds accounts using a password published in this repository. |
 | `npm run gen:secret`      | Prints a fresh value suitable for `JWT_SECRET`.               |
 
@@ -118,6 +119,73 @@ npm run verify:api
 It refuses to write to a non-local server unless you pass `--yes`. Because
 npm does not forward flags on Windows, run it as
 `npx tsx scripts/verify-api.ts --url=https://... --yes`.
+
+## Rate limiting
+
+Login, registration, password changes and the report endpoints are rate
+limited per client address. The counters live in one of two places.
+
+**In process memory**, when no store is configured. Correct on a single
+long-lived server. On a serverless host it is close to useless: each instance
+counts separately and a cold start begins at zero, so the effective limit is
+the configured one times the number of live instances.
+
+**In a shared Redis store**, when one is configured. This is what makes the
+limit real on Vercel.
+
+### Creating a store
+
+Either works; both speak the same HTTP protocol, so there is no client
+library and no connection pool to size.
+
+- **Vercel KV** — Storage, Create, KV, then link it to the project. Linking
+  sets `KV_REST_API_URL` and `KV_REST_API_TOKEN` for you, in every
+  environment. Nothing further to do.
+
+- **Upstash** — create a Redis database at upstash.com, in the region closest
+  to the app, and copy the REST URL and REST token from the database page.
+  Set them as `KV_REST_API_URL` and `KV_REST_API_TOKEN`, or under their own
+  names, `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
+
+Put the pair in `.env.local` to try it locally, and in the Vercel project
+settings for Production and Preview.
+
+### Confirming it works
+
+```powershell
+npm run verify:ratelimit
+```
+
+This is the check worth running before a deploy. It contacts the store named
+in the environment, counts requests through the real limiter with the
+in-memory counters cleared between each one — so anything that accumulates
+had to come back from the store — and confirms the window expires rather than
+being pushed back by each retry. It removes the keys it creates and exits
+non-zero if the store is missing, mistyped or unreachable.
+
+It reports two latency figures, because they mean different things. The
+first-call number includes DNS and the TLS handshake, and is what a cold
+serverless instance pays on its first rate-limited request. The warm number
+is what every request after that costs, on the same instance, once the socket
+is reused. The limiter gives up after 1500ms and falls back to memory, so the
+warm figure is the one that should stay small: keep the store in the same
+region as the deployment and it will sit well under 100ms.
+
+A half-configured or mistyped pair is now refused rather than ignored, and
+the fallback warning repeats every five minutes for as long as it applies.
+Both exist because the previous behaviour was a single log line at boot,
+which is indistinguishable from a healthy deployment once it scrolls away.
+
+### When the store is down
+
+The limiter falls back to per-process counters rather than rejecting the
+request. That is deliberate: this application carries emergency reports, and
+refusing an SOS because a rate-limit store is unreachable is worse than
+counting it per instance.
+
+Setting `RATE_LIMIT_REQUIRE_SHARED=true` reverses that, and requests get a
+503 while the store is unavailable. It is off by default and is not
+recommended here.
 
 ## Rotating a password
 
@@ -155,15 +223,19 @@ tokens yet.
    | `JWT_SECRET`          | Output of `npm run gen:secret`, 32+ characters |
    | `DB_CONNECTION_LIMIT` | `2`                                            |
 
-   Strongly recommended, so rate limits are shared between instances:
+   Also required, so rate limits are shared between instances:
 
    | Variable            | Value                                   |
    | ------------------- | --------------------------------------- |
    | `KV_REST_API_URL`   | From a Vercel KV or Upstash Redis store |
    | `KV_REST_API_TOKEN` | From the same store                     |
 
-   Linking a Vercel KV store to the project sets that pair for you. Outside
-   Vercel, use `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`.
+   Without them the limits still apply, but each serverless instance counts
+   separately and every cold start starts from zero, so the real limit is the
+   configured one multiplied by however many instances happen to be alive.
+   For the login and emergency endpoints that is not a limit worth relying
+   on. See [Rate limiting](#rate-limiting) for how to create the store and
+   confirm it works.
 
    Also required for Supabase:
 

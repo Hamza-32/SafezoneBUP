@@ -32,3 +32,6 @@ next-env.d.ts
 
 # database CA certificate, downloaded per environment
 *.crt
+
+# local credential notes, kept out of the repository
+Passwords_Logins_credentials.txt
