@@ -44,7 +44,11 @@
     --border: 0 0% 90%;
     --input: 0 0% 90%;
     --ring: 358 71% 41%;
-    --radius: 0rem;
+
+    /* Corner radius. One value drives every component: Tailwind derives the
+       md and sm steps from it, so changing this number reshapes the whole
+       interface consistently rather than per component. */
+    --radius: 0.5rem;
     
     /* Chart Colors */
     --chart-1: 358 71% 42%;
@@ -142,9 +146,34 @@
     @apply bg-gradient-to-b from-accent/5 via-background to-primary/5;
   }
   
-  /* Card hover effect */
+  /* Card hover effect.
+     
+     Resting elevation plus a small lift, rather than a shadow that appears
+     out of nothing on hover. The translate is what reads as interactive; the
+     shadow alone is easy to miss on a dense page. */
   .card-hover {
-    @apply transition-all duration-300 hover:shadow-md;
+    @apply transition-all duration-200 ease-out;
+    @apply shadow-[0_1px_2px_hsl(0_0%_0%/0.04),0_1px_3px_hsl(0_0%_0%/0.06)];
+  }
+
+  .card-hover:hover {
+    @apply -translate-y-0.5;
+    @apply shadow-[0_4px_8px_-2px_hsl(0_0%_0%/0.08),0_8px_20px_-4px_hsl(0_0%_0%/0.10)];
+  }
+
+  /* Shadows over a dark background need more opacity to register at all. */
+  .dark .card-hover {
+    @apply shadow-[0_1px_2px_hsl(0_0%_0%/0.30),0_1px_3px_hsl(0_0%_0%/0.20)];
+  }
+
+  .dark .card-hover:hover {
+    @apply shadow-[0_4px_8px_-2px_hsl(0_0%_0%/0.40),0_8px_20px_-4px_hsl(0_0%_0%/0.30)];
+  }
+
+  /* Squares that hold an icon. Slightly tighter than the card they sit in,
+     which is what keeps nested corners from looking concentric. */
+  .icon-tile {
+    @apply inline-flex items-center justify-center rounded-lg;
   }
   
   /* Emergency pulse animation - Removed for cleaner look */

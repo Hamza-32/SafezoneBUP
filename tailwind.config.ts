@@ -65,9 +65,13 @@ const config: Config = {
         },
       },
       borderRadius: {
+        // Derived steps rather than three copies of the same value, so nested
+        // shapes sit inside each other correctly: a button in a card wants a
+        // slightly tighter corner than the card itself.
         lg: "var(--radius)",
-        md: "var(--radius)",
-        sm: "var(--radius)",
+        md: "calc(var(--radius) - 2px)",
+        sm: "calc(var(--radius) - 4px)",
+        xl: "calc(var(--radius) + 4px)",
       },
       keyframes: {
         "accordion-down": {

@@ -217,11 +217,17 @@ tokens yet.
 
    Required:
 
-   | Variable              | Value                                          |
-   | --------------------- | ---------------------------------------------- |
-   | `DATABASE_URL`        | The Supabase pooler connection string          |
-   | `JWT_SECRET`          | Output of `npm run gen:secret`, 32+ characters |
-   | `DB_CONNECTION_LIMIT` | `2`                                            |
+   | Variable       | Value                                          |
+   | -------------- | ---------------------------------------------- |
+   | `DATABASE_URL` | The Supabase pooler connection string          |
+   | `JWT_SECRET`   | Output of `npm run gen:secret`, 32+ characters |
+
+   Do not set `NODE_ENV`. Vercel sets it per deployment, and overriding it by
+   hand is how a production deployment ends up running a development build.
+
+   `DB_CONNECTION_LIMIT` does not need setting either: the pool size defaults
+   to 2 when the `VERCEL` variable is present, which is the right number when
+   many functions each hold their own pool. Set it only to override that.
 
    Also required, so rate limits are shared between instances:
 

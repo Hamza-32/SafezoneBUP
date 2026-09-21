@@ -39,9 +39,11 @@ export default function Homepage({ onNavigate }: HomepageProps) {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-24">
           <div className="text-center max-w-4xl mx-auto">
             {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-accent/10 border border-accent/20 mb-8">
-              <Sparkles className="w-4 h-4 text-accent" />
-              <span className="text-sm font-medium text-accent">Trusted by 5,000+ BUP Students</span>
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 border border-accent/20 mb-8">
+              <Shield className="w-4 h-4 text-accent" />
+              <span className="text-sm font-medium text-accent">
+                Built for the Bangladesh University of Professionals
+              </span>
             </div>
             
             {/* Main heading */}
@@ -53,8 +55,9 @@ export default function Homepage({ onNavigate }: HomepageProps) {
             </h1>
             
             <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto mb-10">
-              SafezoneBUP provides instant emergency reporting, real-time campus security updates, 
-              and 24/7 support for the Bangladesh University of Professionals community.
+              Report an emergency in seconds — with or without an account. Reports reach
+              campus security the moment they are submitted, and you can follow yours
+              until it is resolved.
             </p>
 
             {/* CTA Buttons */}
@@ -78,17 +81,25 @@ export default function Homepage({ onNavigate }: HomepageProps) {
               </Button>
             </div>
 
-            {/* Quick stats */}
-            <div className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-8">
+            {/* What the platform actually does.
+
+               Deliberately capabilities rather than metrics. The numbers that
+               used to sit here — a response time, a count of students, a
+               response rate — were not measured anywhere, and on a safety page
+               an invented response time is the kind of claim someone might
+               rely on in an emergency. */}
+            <div className="mt-16 grid grid-cols-2 sm:grid-cols-4 gap-6">
               {[
-                { value: "24/7", label: "Support Available" },
-                { value: "<5min", label: "Response Time" },
-                { value: "100%", label: "Anonymous Options" },
-                { value: "15+", label: "Safety Features" },
-              ].map((stat, index) => (
-                <div key={index} className="text-center">
-                  <div className="text-2xl sm:text-3xl font-bold text-foreground">{stat.value}</div>
-                  <div className="text-sm text-muted-foreground">{stat.label}</div>
+                { icon: Eye, label: "Anonymous reporting" },
+                { icon: Zap, label: "No account needed" },
+                { icon: MapPin, label: "Shares your location" },
+                { icon: Clock, label: "Open at any hour" },
+              ].map((capability, index) => (
+                <div key={index} className="flex flex-col items-center gap-2 text-center">
+                  <div className="icon-tile w-10 h-10 bg-accent/10 text-accent">
+                    <capability.icon className="w-5 h-5" />
+                  </div>
+                  <div className="text-sm font-medium text-foreground">{capability.label}</div>
                 </div>
               ))}
             </div>
@@ -149,14 +160,14 @@ export default function Homepage({ onNavigate }: HomepageProps) {
                 className={`cursor-pointer card-hover border ${
                   action.urgent 
                     ? 'border-primary/20 bg-primary/5' 
-                    : 'border-transparent hover:border-accent/20'
+                    : 'hover:border-accent/30'
                 }`}
                 onClick={() => onNavigate(action.page)}
               >
                 <CardContent className="p-6 text-center">
-                  <div className={`inline-flex items-center justify-center w-14 h-14 mb-4 ${
-                    action.urgent 
-                      ? 'bg-primary/10 text-primary' 
+                  <div className={`icon-tile w-14 h-14 mb-4 ${
+                    action.urgent
+                      ? 'bg-primary/10 text-primary'
                       : 'bg-accent/10 text-accent'
                   }`}>
                     <action.icon className="w-7 h-7" />
@@ -188,9 +199,9 @@ export default function Homepage({ onNavigate }: HomepageProps) {
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
             {/* Feature 1 - Emergency Reporting */}
-            <Card className="card-hover border border-transparent hover:border-primary/30">
+            <Card className="card-hover border hover:border-primary/40">
               <CardHeader className="pb-4">
-                <div className="w-12 h-12 bg-primary/10 flex items-center justify-center mb-4">
+                <div className="icon-tile w-12 h-12 bg-primary/10 text-primary mb-4">
                   <AlertTriangle className="w-6 h-6 text-primary" />
                 </div>
                 <CardTitle className="text-xl">Instant Emergency Reporting</CardTitle>
@@ -211,9 +222,9 @@ export default function Homepage({ onNavigate }: HomepageProps) {
             </Card>
 
             {/* Feature 2 - Discussion Board */}
-            <Card className="card-hover border border-transparent hover:border-accent/30">
+            <Card className="card-hover border hover:border-accent/40">
               <CardHeader className="pb-4">
-                <div className="w-12 h-12 bg-accent/10 flex items-center justify-center mb-4">
+                <div className="icon-tile w-12 h-12 bg-accent/10 text-accent mb-4">
                   <Heart className="w-6 h-6 text-accent" />
                 </div>
                 <CardTitle className="text-xl">Anonymous Support</CardTitle>
@@ -234,9 +245,9 @@ export default function Homepage({ onNavigate }: HomepageProps) {
             </Card>
 
             {/* Feature 3 - Safety Check-In */}
-            <Card className="card-hover border border-transparent hover:border-accent/30">
+            <Card className="card-hover border hover:border-accent/40">
               <CardHeader className="pb-4">
-                <div className="w-12 h-12 bg-accent/10 flex items-center justify-center mb-4">
+                <div className="icon-tile w-12 h-12 bg-accent/10 text-accent mb-4">
                   <Clock className="w-6 h-6 text-accent" />
                 </div>
                 <CardTitle className="text-xl">Safety Check-In</CardTitle>
@@ -257,9 +268,9 @@ export default function Homepage({ onNavigate }: HomepageProps) {
             </Card>
 
             {/* Feature 4 - Smart Complaints */}
-            <Card className="card-hover border border-transparent hover:border-accent/30">
+            <Card className="card-hover border hover:border-accent/40">
               <CardHeader className="pb-4">
-                <div className="w-12 h-12 bg-accent/10 flex items-center justify-center mb-4">
+                <div className="icon-tile w-12 h-12 bg-accent/10 text-accent mb-4">
                   <MessageSquare className="w-6 h-6 text-accent" />
                 </div>
                 <CardTitle className="text-xl">Smart Complaints</CardTitle>
@@ -280,9 +291,9 @@ export default function Homepage({ onNavigate }: HomepageProps) {
             </Card>
 
             {/* Feature 5 - Lost & Found */}
-            <Card className="card-hover border border-transparent hover:border-accent/30">
+            <Card className="card-hover border hover:border-accent/40">
               <CardHeader className="pb-4">
-                <div className="w-12 h-12 bg-accent/10 flex items-center justify-center mb-4">
+                <div className="icon-tile w-12 h-12 bg-accent/10 text-accent mb-4">
                   <Search className="w-6 h-6 text-accent" />
                 </div>
                 <CardTitle className="text-xl">Lost & Found</CardTitle>
@@ -303,9 +314,9 @@ export default function Homepage({ onNavigate }: HomepageProps) {
             </Card>
 
             {/* Feature 6 - Resources */}
-            <Card className="card-hover border border-transparent hover:border-accent/30">
+            <Card className="card-hover border hover:border-accent/40">
               <CardHeader className="pb-4">
-                <div className="w-12 h-12 bg-accent/10 flex items-center justify-center mb-4">
+                <div className="icon-tile w-12 h-12 bg-accent/10 text-accent mb-4">
                   <Shield className="w-6 h-6 text-accent" />
                 </div>
                 <CardTitle className="text-xl">Safety Resources</CardTitle>
@@ -353,17 +364,17 @@ export default function Homepage({ onNavigate }: HomepageProps) {
                   },
                   {
                     icon: Zap,
-                    title: "Instant Response",
-                    description: "Campus security receives alerts in real-time"
+                    title: "Routed immediately",
+                    description: "Every responder on duty is notified the moment a report lands"
                   },
                   {
                     icon: Eye,
-                    title: "24/7 Monitoring",
-                    description: "Round-the-clock support and emergency assistance"
+                    title: "Always open",
+                    description: "Reports can be submitted at any hour, from any device"
                   }
                 ].map((item, index) => (
                   <div key={index} className="flex gap-4">
-                    <div className="w-10 h-10 bg-accent/10 flex items-center justify-center flex-shrink-0">
+                    <div className="icon-tile w-10 h-10 bg-accent/10 text-accent flex-shrink-0">
                       <item.icon className="w-5 h-5 text-accent" />
                     </div>
                     <div>
@@ -375,24 +386,41 @@ export default function Homepage({ onNavigate }: HomepageProps) {
               </div>
             </div>
 
+            {/* What happens to a report, rather than invented counts.
+               A student deciding whether to submit one wants to know where it
+               goes, not how many others have used the service. */}
             <div className="relative">
-              <div className="grid grid-cols-2 gap-4">
-                <Card className="p-6 text-center card-hover">
-                  <div className="text-4xl font-bold text-primary mb-2">15+</div>
-                  <p className="text-sm text-muted-foreground">Academic Programs</p>
-                </Card>
-                <Card className="p-6 text-center card-hover">
-                  <div className="text-4xl font-bold text-accent mb-2">5000+</div>
-                  <p className="text-sm text-muted-foreground">Students Protected</p>
-                </Card>
-                <Card className="p-6 text-center card-hover">
-                  <div className="text-4xl font-bold text-accent mb-2">300+</div>
-                  <p className="text-sm text-muted-foreground">Faculty & Staff</p>
-                </Card>
-                <Card className="p-6 text-center card-hover">
-                  <div className="text-4xl font-bold text-primary mb-2">100%</div>
-                  <p className="text-sm text-muted-foreground">Response Rate</p>
-                </Card>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  {
+                    step: "1",
+                    title: "You submit",
+                    body: "From any device, signed in or not. Attach a location if you want to.",
+                  },
+                  {
+                    step: "2",
+                    title: "Security is notified",
+                    body: "Every responder on duty receives the report as soon as it lands.",
+                  },
+                  {
+                    step: "3",
+                    title: "It gets picked up",
+                    body: "A responder takes ownership, and the status changes as they act.",
+                  },
+                  {
+                    step: "4",
+                    title: "You can follow it",
+                    body: "Signed-in reporters see their own reports through to resolution.",
+                  },
+                ].map((item) => (
+                  <Card key={item.step} className="p-6 card-hover">
+                    <div className="icon-tile w-8 h-8 mb-3 bg-primary/10 text-primary text-sm font-bold">
+                      {item.step}
+                    </div>
+                    <h3 className="font-semibold text-foreground mb-1">{item.title}</h3>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{item.body}</p>
+                  </Card>
+                ))}
               </div>
             </div>
           </div>
@@ -404,7 +432,7 @@ export default function Homepage({ onNavigate }: HomepageProps) {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-primary/10 flex items-center justify-center">
+              <div className="icon-tile w-12 h-12 bg-primary/10 text-primary">
                 <Phone className="w-6 h-6 text-primary" />
               </div>
               <div>
@@ -440,8 +468,8 @@ export default function Homepage({ onNavigate }: HomepageProps) {
             Ready to Get Started?
           </h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Join thousands of BUP students, faculty, and staff who trust SafezoneBUP 
-            for campus safety. Create your account or report an emergency immediately.
+            An account lets you follow your reports through to resolution and keep your
+            emergency contacts to hand. You do not need one to report an emergency.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button
@@ -469,7 +497,7 @@ export default function Homepage({ onNavigate }: HomepageProps) {
         <div className="max-w-7xl mx-auto">
           <div className="flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-primary flex items-center justify-center">
+              <div className="icon-tile w-10 h-10 bg-primary text-primary-foreground">
                 <Shield className="w-5 h-5 text-primary-foreground" />
               </div>
               <div>

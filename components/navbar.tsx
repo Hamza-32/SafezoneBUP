@@ -42,7 +42,7 @@ export function Navbar({ user, onNavigate, onLogout }: NavbarProps) {
             className="flex items-center gap-3 cursor-pointer group"
             onClick={() => onNavigate("home")}
           >
-            <div className="flex h-10 w-10 items-center justify-center bg-primary text-primary-foreground shadow-sm transition-transform group-hover:scale-105">
+            <div className="icon-tile h-10 w-10 bg-primary text-primary-foreground shadow-sm transition-transform group-hover:scale-105">
               <Shield className="h-5 w-5" />
             </div>
             <div className="hidden sm:block">
