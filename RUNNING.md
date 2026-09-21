@@ -187,6 +187,63 @@ Setting `RATE_LIMIT_REQUIRE_SHARED=true` reverses that, and requests get a
 503 while the store is unavailable. It is off by default and is not
 recommended here.
 
+## Safety check-in escalation
+
+A check-in records where someone is going and when they expect to arrive. The
+point of it is that if they never confirm arrival, somebody is told.
+
+That last part needs a scheduler. The database has always had a `missed`
+status and nothing ever set it, so an unconfirmed check-in sat at `pending`
+indefinitely and no responder was notified. `/api/checkin/escalate` is what
+sets it: it finds check-ins more than fifteen minutes past their expected
+arrival, marks them missed, and notifies every admin and security account.
+
+### Set the secret
+
+The endpoint has no session to authenticate, so it uses a shared secret and
+refuses every request until one is configured. An open endpoint here would
+let anyone escalate every pending check-in at once and bury responders.
+
+```powershell
+npm run gen:secret
+```
+
+Set the result as `CHECKIN_ESCALATION_SECRET`, locally and in Vercel.
+
+### Point a scheduler at it
+
+Vercel's Hobby plan only triggers cron jobs once a day, which is far too
+coarse: a check-in due at 21:00 might not be escalated until the following
+evening. Use an external scheduler instead. A free one such as cron-job.org
+gives minute-level granularity:
+
+| Setting | Value                                                   |
+| ------- | ------------------------------------------------------- |
+| URL     | `https://<your-app>.vercel.app/api/checkin/escalate`    |
+| Method  | `POST`                                                  |
+| Header  | `x-escalation-secret: <the value you generated>`        |
+| Every   | 5 minutes                                               |
+
+`Authorization: Bearer <secret>` is accepted too, which is the form Vercel
+Cron sends, and the endpoint answers GET as well as POST for the same reason.
+
+Check it by hand:
+
+```powershell
+curl -X POST https://<your-app>.vercel.app/api/checkin/escalate `
+  -H "x-escalation-secret: <secret>"
+```
+
+A run with nothing to do reports `No overdue check-ins`, which is the normal
+result.
+
+### If you skip the scheduler
+
+The application sweeps for overdue check-ins when a responder loads the
+dashboard, at most once every five minutes per instance. That is a safety
+net, not the mechanism: it only runs while somebody is using the application,
+and an overnight check-in is exactly the case where nobody is.
+
 ## Rotating a password
 
 ```powershell

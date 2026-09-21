@@ -211,7 +211,7 @@ export default function Homepage({ onNavigate }: HomepageProps) {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-3">
-                  {["No login required", "GPS location sharing", "Real-time tracking", "Anonymous options"].map((item, i) => (
+                  {["No login required", "GPS location sharing", "Reference code to follow up", "Anonymous options"].map((item, i) => (
                     <li key={i} className="flex items-center gap-3 text-sm">
                       <CheckCircle className="w-4 h-4 text-accent flex-shrink-0" />
                       <span className="text-muted-foreground">{item}</span>
@@ -257,7 +257,7 @@ export default function Homepage({ onNavigate }: HomepageProps) {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-3">
-                  {["Automatic alerts", "Emergency contacts", "SOS trigger", "Travel monitoring"].map((item, i) => (
+                  {["Alerts if you don't arrive", "Emergency contacts", "SOS trigger", "Set an expected time"].map((item, i) => (
                     <li key={i} className="flex items-center gap-3 text-sm">
                       <CheckCircle className="w-4 h-4 text-accent flex-shrink-0" />
                       <span className="text-muted-foreground">{item}</span>
@@ -303,7 +303,7 @@ export default function Homepage({ onNavigate }: HomepageProps) {
               </CardHeader>
               <CardContent>
                 <ul className="space-y-3">
-                  {["Quick posting", "Category filters", "Contact privacy", "Location tracking"].map((item, i) => (
+                  {["Quick posting", "Category filters", "Contact privacy", "Where it was lost"].map((item, i) => (
                     <li key={i} className="flex items-center gap-3 text-sm">
                       <CheckCircle className="w-4 h-4 text-accent flex-shrink-0" />
                       <span className="text-muted-foreground">{item}</span>

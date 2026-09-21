@@ -17,12 +17,19 @@ import {
 } from '@/lib/api-middleware';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { parseBody, createCheckinSchema, updateCheckinSchema } from '@/lib/validation';
+import { sweepOverdueCheckins } from '@/lib/checkin-escalation';
 
 const MAX_CHECKINS_RETURNED = 50;
 
 export async function GET(request: NextRequest) {
   const auth = await requireAuth(request);
   if (!auth.ok) return auth.response;
+
+  // Safety net for a deployment with no scheduler wired up. Throttled to one
+  // pass every few minutes per instance, does not block this response, and
+  // never throws. The scheduled endpoint is the real mechanism; this only
+  // narrows the window in which an overdue check-in goes unnoticed.
+  sweepOverdueCheckins();
 
   try {
     const { searchParams } = new URL(request.url);

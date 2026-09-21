@@ -626,11 +626,87 @@ async function checkRateLimitConfiguration(): Promise<void> {
   resetRateLimitWarnings();
 }
 
+// ---------------------------------------------------------------------------
+// The check-in escalation endpoint.
+//
+// It runs without a session, so a shared secret is the only thing standing in
+// front of it. An open endpoint would let anyone escalate every pending
+// check-in at once and bury responders in alerts, which is why a missing or
+// weak secret has to refuse rather than fall through to running unprotected.
+//
+// Only the rejection paths are exercised here: none of them reach the
+// database, so this stays an offline check.
+// ---------------------------------------------------------------------------
+
+async function checkEscalationEndpointAuth(): Promise<void> {
+  const { NextRequest } = await import('next/server');
+  const { GET } = await import('../app/api/checkin/escalate/route');
+
+  const strongSecret = 'a'.repeat(40);
+
+  const call = (headers: Record<string, string>) =>
+    GET(
+      new NextRequest('http://localhost/api/checkin/escalate', {
+        method: 'GET',
+        headers,
+      })
+    );
+
+  section('Check-in escalation endpoint');
+
+  const previousSecret = process.env.CHECKIN_ESCALATION_SECRET;
+  const previousCron = process.env.CRON_SECRET;
+
+  delete process.env.CHECKIN_ESCALATION_SECRET;
+  delete process.env.CRON_SECRET;
+
+  check('with no secret configured the endpoint refuses', (await call({})).status === 401);
+  check(
+    'with no secret configured even a plausible token is refused',
+    (await call({ 'x-escalation-secret': strongSecret })).status === 401
+  );
+
+  process.env.CHECKIN_ESCALATION_SECRET = 'short';
+  check(
+    'a secret shorter than 16 characters is treated as unset',
+    (await call({ 'x-escalation-secret': 'short' })).status === 401
+  );
+
+  process.env.CHECKIN_ESCALATION_SECRET = strongSecret;
+
+  check('a wrong secret is refused', (await call({ 'x-escalation-secret': 'b'.repeat(40) })).status === 401);
+  check(
+    'a secret of the wrong length is refused',
+    (await call({ 'x-escalation-secret': 'a'.repeat(39) })).status === 401
+  );
+  check('a missing header is refused', (await call({})).status === 401);
+  check(
+    'a malformed Authorization header is refused',
+    (await call({ authorization: strongSecret })).status === 401
+  );
+
+  const refused = await call({ 'x-escalation-secret': 'b'.repeat(40) });
+  const body = (await refused.json()) as { error?: string };
+  check(
+    'the refusal does not reveal whether a secret is configured',
+    body.error === 'Unauthorized'
+  );
+
+  if (previousSecret === undefined) {
+    delete process.env.CHECKIN_ESCALATION_SECRET;
+  } else {
+    process.env.CHECKIN_ESCALATION_SECRET = previousSecret;
+  }
+
+  if (previousCron !== undefined) process.env.CRON_SECRET = previousCron;
+}
+
 checkColumnCaseMap()
   .then(checkJwtSecretPolicy)
   .then(checkPlaceholderTranslation)
   .then(checkSharedRateLimiter)
   .then(checkRateLimitConfiguration)
+  .then(checkEscalationEndpointAuth)
   .catch((error) => {
     failures += 1;
     console.error(`  FAIL  asynchronous checks threw: ${error?.message ?? error}`);
