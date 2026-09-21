@@ -12,7 +12,9 @@ import apiClient from '@/lib/api-client';
 interface SafetyResource {
   id: number;
   title: string;
-  description: string;
+  // safety_resources.description is nullable; the card already guards the
+  // display, but the search filter did not.
+  description: string | null;
   category: string;
   content: string;
   contactInfo: {
@@ -62,7 +64,7 @@ export default function SafetyResourceHub() {
     if (searchTerm) {
       filtered = filtered.filter(resource =>
         resource.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        resource.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (resource.description ?? '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         resource.content.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }

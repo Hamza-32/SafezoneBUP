@@ -42,7 +42,7 @@ export const seedData = async () => {
       'admin@bup.edu.bd',
       adminPassword,
       'admin',
-      '+88024-9870-5700',
+      '+8809666790799',
       true
     ]);
 
@@ -253,38 +253,65 @@ export const seedData = async () => {
         notification.relatedType
       ]);
     }    // Create emergency contacts
+    // Only numbers that can be checked against a public source are seeded.
+    //
+    // The previous list invented a +88024-9870-57xx range for campus security,
+    // the medical centre and counselling, and gave 199 for the fire service.
+    // None of those reach anyone. On a safety application a wrong number is
+    // worse than no number, because it is dialled in the one situation where
+    // a second attempt is expensive.
+    //
+    // BUP's own extensions are not published, so an administrator adds them
+    // through the contacts screen once the university supplies them. The
+    // national services below are correct for all of Bangladesh.
     const emergencyContacts = [
       {
-        name: 'BUP Campus Security',
-        phoneNumber: '+88024-9870-5700',
-        email: 'security@bup.edu.bd',
-        department: 'Security',
+        name: 'National Emergency Service',
+        phoneNumber: '999',
+        email: null,
+        department: 'Police, Fire and Ambulance',
         isActive: true,
         displayOrder: 1
       },
       {
-        name: 'BUP Medical Center',
-        phoneNumber: '+88024-9870-5706',
-        email: 'medical@bup.edu.bd',
-        department: 'Health Services',
+        name: 'Bangladesh University of Professionals',
+        phoneNumber: '+8809666790799',
+        email: 'info@bup.edu.bd',
+        department: 'University main line',
         isActive: true,
         displayOrder: 2
       },
       {
         name: 'Fire Service & Civil Defence',
-        phoneNumber: '199',
-        email: 'fire.dhaka@fscd.gov.bd',
+        phoneNumber: '102',
+        email: null,
         department: 'Emergency Services',
         isActive: true,
         displayOrder: 3
       },
       {
-        name: 'Student Counseling',
-        phoneNumber: '+88024-9870-5705',
-        email: 'counseling@bup.edu.bd',
-        department: 'Student Affairs',
+        name: 'Shastho Batayon health line',
+        phoneNumber: '16263',
+        email: null,
+        department: 'Health Services',
         isActive: true,
         displayOrder: 4
+      },
+      {
+        name: 'Violence against women and children helpline',
+        phoneNumber: '109',
+        email: null,
+        department: 'Support Services',
+        isActive: true,
+        displayOrder: 5
+      },
+      {
+        name: 'Government information helpline',
+        phoneNumber: '333',
+        email: null,
+        department: 'Support Services',
+        isActive: true,
+        displayOrder: 6
       }
     ];
 
@@ -308,23 +335,21 @@ export const seedData = async () => {
         title: 'BUP Campus Emergency Hotline',
         description: 'Available 24/7 for all campus emergencies',
         category: 'emergency',
-        content: 'Call this number for any emergency situation on BUP campus including medical emergencies, security threats, or urgent safety concerns.',
+        content: '999 is Bangladesh\'s national emergency line and reaches police, fire and ambulance from any phone, free of charge, at any hour. Use it for anything time critical on or off campus, then file a report here so BUP security has a record.',
         contactInfo: JSON.stringify({
           phone: '999',
-          campusPhone: '+88024-9870-5700',
-          location: 'Security Office, Administration Building'
+          hours: 'Toll free, 24 hours'
         })
       },
       {
         title: 'Student Counseling Services',
         description: 'Confidential support for mental health and counseling',
         category: 'mental_health',
-        content: 'Free, confidential counseling services available for BUP students experiencing stress, anxiety, depression, or other mental health concerns.',
+        content: 'Shastho Batayon (16263) is the government health line and can refer you to mental health support. BUP\'s own counselling contact is not published here yet; ask Student Affairs, and an administrator can add it to this page.',
         contactInfo: JSON.stringify({
-          phone: '+88024-9870-5704',
-          campusPhone: '+88024-9870-5705',
-          online: 'https://bup.edu.bd/student-services',
-          location: 'Student Affairs Office, 2nd Floor, Admin Building'
+          phone: '16263',
+          website: 'https://bup.edu.bd',
+          hours: 'Shastho Batayon operates 24 hours'
         })
       },
       {
@@ -338,12 +363,11 @@ export const seedData = async () => {
         title: 'Medical Emergency Services',
         description: 'Campus medical facility and emergency services',
         category: 'mental_health',
-        content: 'BUP Medical Center provides first aid, emergency medical care, and health services for students, faculty, and staff.',
+        content: 'For a medical emergency call 999, which dispatches an ambulance. The university main line can direct you to campus health services during office hours.',
         contactInfo: JSON.stringify({
-          phone: '+88024-9870-5706',
-          email: 'medical@bup.edu.bd',
-          location: 'BUP Medical Center, Ground Floor',
-          hours: 'Sunday-Thursday 8AM-5PM, Emergency support 24/7'
+          phone: '999',
+          campusPhone: '+8809666790799',
+          hours: '999 for an ambulance at any hour'
         })
       },
       {
@@ -352,9 +376,9 @@ export const seedData = async () => {
         category: 'helplines',
         content: 'National helpline providing support for women facing violence, harassment, or distress situations. Available 24/7 with trained counselors.',
         contactInfo: JSON.stringify({
-          phone: '10921',
+          phone: '109',
           website: 'https://mowca.gov.bd',
-          location: 'National Women Support Center'
+          hours: 'Toll free, 24 hours'
         })
       }
     ];
@@ -528,7 +552,7 @@ export const seedData = async () => {
         location: 'Administration Building, 1st Floor',
         dateReported: new Date().toISOString().split('T')[0],
         dateLostFound: new Date().toISOString().split('T')[0], // Today
-        contactInfo: JSON.stringify({ email: 'admin@bup.edu.bd', phone: '+88024-9870-5700', preferredContact: 'email' }),
+        contactInfo: JSON.stringify({ email: 'admin@bup.edu.bd', phone: '+8809666790799', preferredContact: 'email' }),
         status: 'active',
         isAnonymous: false
       }

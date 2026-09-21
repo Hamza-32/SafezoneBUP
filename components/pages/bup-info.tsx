@@ -76,7 +76,7 @@ export default function BUPInfo({ onNavigate }: BUPInfoProps) {
                 <div className="space-y-3">
                   <div>
                     <h4 className="font-semibold text-[#1B4D3E]">Main Campus</h4>
-                    <p className="text-muted-foreground">VIP Road, Mirpur Cantonment, Dhaka-1216, Bangladesh</p>
+                    <p className="text-muted-foreground">Mirpur Cantonment, Dhaka-1216, Bangladesh</p>
                   </div>
                   <div>
                     <h4 className="font-semibold text-[#1B4D3E]">Additional Campus</h4>
@@ -97,15 +97,26 @@ export default function BUPInfo({ onNavigate }: BUPInfoProps) {
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>+88024-9870-5700</span>
+                    <a href="tel:+8809666790799" className="hover:underline">
+                      +880 9666 790799
+                    </a>
                   </div>
                   <div className="flex items-center gap-2">
                     <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span>info@bup.edu.bd</span>
+                    <a href="mailto:info@bup.edu.bd" className="hover:underline">
+                      info@bup.edu.bd
+                    </a>
                   </div>
                   <div className="flex items-center gap-2">
                     <Globe className="h-4 w-4 text-muted-foreground" />
-                    <span>www.bup.edu.bd</span>
+                    <a
+                      href="https://bup.edu.bd"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline"
+                    >
+                      bup.edu.bd
+                    </a>
                   </div>
                 </div>
               </CardContent>

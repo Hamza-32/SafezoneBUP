@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, Plus, MapPin, Calendar, Phone, Mail, Eye, EyeOff, Package, CheckCircle } from 'lucide-react';
+import { Search, Plus, MapPin, Calendar, Phone, Mail, Eye, EyeOff, Package, CheckCircle, Lock } from 'lucide-react';
 import { toast } from 'sonner';
 import apiClient from '@/lib/api-client';
 
@@ -20,15 +20,24 @@ interface LostAndFoundItem {
   title: string;
   description: string;
   category: string;
-  location: string;
+  // Nullable in the schema, and the post form leaves it optional, so an item
+  // without a location is ordinary rather than exceptional.
+  location: string | null;
   dateReported: string;
   dateLostFound?: string;
   imageUrl?: string;
+  // Null whenever the viewer is not entitled to see contact details: the
+  // listing is public so an item can be searched for before signing up, but
+  // the endpoint withholds phone numbers and addresses from anonymous
+  // callers so the board cannot be scraped. Declaring this non-null is what
+  // let a crash reach production.
   contactInfo: {
     email?: string;
     phone?: string;
     preferredContact?: string;
-  };
+  } | null;
+  /** True when the poster left contact details, even if they are withheld. */
+  contactAvailable?: boolean;
   status: 'active' | 'resolved' | 'expired';
   isAnonymous: boolean;
   firstName?: string;
@@ -99,7 +108,7 @@ export default function LostAndFound() {
       filtered = filtered.filter(item =>
         item.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         item.description.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        item.location.toLowerCase().includes(searchTerm.toLowerCase())
+        (item.location ?? '').toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -489,24 +498,31 @@ export default function LostAndFound() {
                         </div>
                       )}
                       
-                      {item.contactInfo.email && (
-                        <a 
+                      {item.contactInfo?.email && (
+                        <a
                           href={`mailto:${item.contactInfo.email}`}
-                          className="flex items-center space-x-1 text-blue-600 hover:underline"
+                          className="flex items-center space-x-1 text-primary hover:underline"
                         >
                           <Mail className="h-3 w-3" />
                           <span>Email</span>
                         </a>
                       )}
-                      
-                      {item.contactInfo.phone && (
-                        <a 
+
+                      {item.contactInfo?.phone && (
+                        <a
                           href={`tel:${item.contactInfo.phone}`}
-                          className="flex items-center space-x-1 text-blue-600 hover:underline"
+                          className="flex items-center space-x-1 text-primary hover:underline"
                         >
                           <Phone className="h-3 w-3" />
                           <span>Call</span>
                         </a>
+                      )}
+
+                      {item.contactAvailable && !item.contactInfo && (
+                        <span className="flex items-center space-x-1 text-muted-foreground">
+                          <Lock className="h-3 w-3" />
+                          <span>Sign in to see contact details</span>
+                        </span>
                       )}
                     </div>
                     

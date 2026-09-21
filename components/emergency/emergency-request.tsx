@@ -246,20 +246,24 @@ export default function EmergencyRequest({ onNavigate }: EmergencyRequestProps) 
                 </div>
               </div>
               <div className="flex gap-2 w-full sm:w-auto">
-                <Button 
+                <Button
+                  asChild
                   variant="outline"
                   className="flex-1 sm:flex-none border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                  onClick={() => window.open("tel:+880249870700")}
                 >
-                  <Phone className="h-4 w-4 mr-2" />
-                  Security
+                  <a href="tel:+8809666790799">
+                    <Phone className="h-4 w-4 mr-2" />
+                    BUP
+                  </a>
                 </Button>
-                <Button 
+                <Button
+                  asChild
                   className="flex-1 sm:flex-none bg-primary hover:bg-primary/90"
-                  onClick={() => window.open("tel:999")}
                 >
-                  <Siren className="h-4 w-4 mr-2" />
-                  999
+                  <a href="tel:999">
+                    <Siren className="h-4 w-4 mr-2" />
+                    999
+                  </a>
                 </Button>
               </div>
             </div>

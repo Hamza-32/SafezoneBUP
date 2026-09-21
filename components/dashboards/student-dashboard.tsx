@@ -199,24 +199,25 @@ export default function StudentDashboard({ user }: StudentDashboardProps = {}) {
                   <div>
                     <h3 className="text-xl font-bold text-foreground">Emergency Contacts</h3>
                     <p className="text-muted-foreground text-sm mt-1">
-                      Direct line to BUP campus security and medical
+                      999 reaches police, fire and ambulance, toll free, at any hour
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Button 
+                    <Button asChild className="bg-primary hover:bg-primary/90">
+                      <a href="tel:999">
+                        <Heart className="h-4 w-4 mr-2" />
+                        Call 999
+                      </a>
+                    </Button>
+                    <Button
+                      asChild
                       variant="outline"
                       className="border-accent text-accent hover:bg-accent hover:text-accent-foreground"
-                      onClick={() => window.open("tel:+880249870700")}
                     >
-                      <Phone className="h-4 w-4 mr-2" />
-                      Security
-                    </Button>
-                    <Button 
-                      variant="outline"
-                      onClick={() => window.open("tel:+880249870706")}
-                    >
-                      <Heart className="h-4 w-4 mr-2" />
-                      Medical
+                      <a href="tel:+8809666790799">
+                        <Phone className="h-4 w-4 mr-2" />
+                        BUP
+                      </a>
                     </Button>
                   </div>
                 </div>

@@ -154,6 +154,111 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    id: '002-replace-invented-contact-numbers',
+    description:
+      'Replace seeded contact numbers that reach nobody with the published national services and BUP main line',
+    up: async () => {
+      // The original seed invented a +88024-9870-57xx range for campus
+      // security, the medical centre and counselling, and listed 199 for the
+      // fire service. Those rows are already in every database that has been
+      // seeded, and the seed uses INSERT IGNORE, so correcting the seed file
+      // alone leaves them in place.
+      //
+      // On a safety application a number that reaches nobody is worse than no
+      // number at all: it is dialled in the one situation where a second
+      // attempt costs the most. Sources: bup.edu.bd/contact for the
+      // university line, and the national service numbers published by the
+      // Bangladesh government (999, 102, 109, 333, 16263).
+
+      if (!(await tableExists('emergency_contacts'))) {
+        console.log('   skipped emergency_contacts (table does not exist yet)');
+      } else {
+        const invented = await Database.query(
+          `SELECT id FROM emergency_contacts
+           WHERE phoneNumber LIKE '%9870-5%' OR phoneNumber = '199'`
+        );
+
+        if (invented.length === 0) {
+          console.log('   emergency_contacts holds no invented numbers');
+        } else {
+          // Removed rather than rewritten: there is no correct BUP extension
+          // to put in their place, and inventing a second one would repeat
+          // the original mistake. An administrator adds the real extensions
+          // through the contacts screen.
+          await Database.query(
+            `DELETE FROM emergency_contacts
+             WHERE phoneNumber LIKE '%9870-5%' OR phoneNumber = '199'`
+          );
+          console.log(`   removed ${invented.length} unreachable contact(s)`);
+        }
+
+        const verified: Array<[string, string, string | null, string, number]> = [
+          ['National Emergency Service', '999', null, 'Police, Fire and Ambulance', 1],
+          [
+            'Bangladesh University of Professionals',
+            '+8809666790799',
+            'info@bup.edu.bd',
+            'University main line',
+            2,
+          ],
+          ['Fire Service & Civil Defence', '102', null, 'Emergency Services', 3],
+          ['Shastho Batayon health line', '16263', null, 'Health Services', 4],
+          [
+            'Violence against women and children helpline',
+            '109',
+            null,
+            'Support Services',
+            5,
+          ],
+          ['Government information helpline', '333', null, 'Support Services', 6],
+        ];
+
+        for (const [name, phoneNumber, email, department, displayOrder] of verified) {
+          const existing = await Database.query(
+            'SELECT id FROM emergency_contacts WHERE phoneNumber = ?',
+            [phoneNumber]
+          );
+
+          if (existing.length > 0) continue;
+
+          await Database.query(
+            `INSERT INTO emergency_contacts
+               (name, phoneNumber, email, department, isActive, displayOrder)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [name, phoneNumber, email, department, true, displayOrder]
+          );
+          console.log(`   added ${name} (${phoneNumber})`);
+        }
+      }
+
+      if (!(await tableExists('safety_resources'))) {
+        console.log('   skipped safety_resources (table does not exist yet)');
+        return;
+      }
+
+      // contactInfo is JSONB holding the same invented numbers.
+      const stale = await Database.query(
+        `SELECT id FROM safety_resources WHERE contactInfo::text LIKE '%9870-5%'`
+      );
+
+      if (stale.length === 0) {
+        console.log('   safety_resources holds no invented numbers');
+        return;
+      }
+
+      await Database.query(
+        `UPDATE safety_resources
+         SET contactInfo = jsonb_build_object(
+               'phone', '999',
+               'campusPhone', '+8809666790799',
+               'hours', 'Call 999 at any hour, toll free'
+             )
+         WHERE contactInfo::text LIKE '%9870-5%'`
+      );
+      console.log(`   corrected ${stale.length} safety resource contact block(s)`);
+    },
+  },
 ];
 
 /** Where the connection settings currently point. */

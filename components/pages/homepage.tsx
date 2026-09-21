@@ -436,18 +436,29 @@ export default function Homepage({ onNavigate }: HomepageProps) {
                 <Phone className="w-6 h-6 text-primary" />
               </div>
               <div>
-                <h3 className="font-semibold text-foreground">Emergency Contacts</h3>
-                <p className="text-sm text-muted-foreground">BUP Security: +88024-9870-5700 | Medical: +88024-9870-5706</p>
+                <h3 className="font-semibold text-foreground">In an emergency, call 999</h3>
+                <p className="text-sm text-muted-foreground">
+                  Bangladesh&apos;s national emergency line — police, fire and ambulance,
+                  toll free, 24 hours. BUP:{' '}
+                  <a href="tel:+8809666790799" className="hover:underline">
+                    +880 9666 790799
+                  </a>
+                </p>
               </div>
             </div>
             <div className="flex gap-3">
-              <Button 
-                variant="outline" 
+              {/* A plain link, not window.open: a tel: URL opened as a popup is
+                  blocked or leaves a blank tab on several mobile browsers, and
+                  this is the control someone uses in an emergency. */}
+              <Button
+                asChild
+                variant="outline"
                 className="border-primary text-primary hover:bg-primary hover:text-primary-foreground"
-                onClick={() => window.open("tel:+880249870700")}
               >
-                <Phone className="w-4 h-4 mr-2" />
-                Call Security
+                <a href="tel:999">
+                  <Phone className="w-4 h-4 mr-2" />
+                  Call 999
+                </a>
               </Button>
               <Button 
                 className="bg-primary hover:bg-primary/90"
