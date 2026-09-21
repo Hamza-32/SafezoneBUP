@@ -75,12 +75,8 @@ export default function BUPInfo({ onNavigate }: BUPInfoProps) {
               <CardContent>
                 <div className="space-y-3">
                   <div>
-                    <h4 className="font-semibold text-[#1B4D3E]">Main Campus</h4>
+                    <h4 className="font-semibold text-[#1B4D3E]">Campus</h4>
                     <p className="text-muted-foreground">Mirpur Cantonment, Dhaka-1216, Bangladesh</p>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-[#1B4D3E]">Additional Campus</h4>
-                    <p className="text-muted-foreground">Baridhara, Dhaka, Bangladesh</p>
                   </div>
                 </div>
               </CardContent>
