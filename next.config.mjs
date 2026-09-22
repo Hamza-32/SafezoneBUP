@@ -26,6 +26,38 @@ const securityHeaders = [
     key: 'Strict-Transport-Security',
     value: 'max-age=31536000; includeSubDomains',
   },
+  {
+    key: 'Content-Security-Policy',
+    value: [
+      "default-src 'self'",
+
+      // Next.js inlines its hydration bootstrap and, in development, evaluates
+      // code for fast refresh. Locking script-src down properly means issuing
+      // a per-request nonce from middleware, which is worth doing but is a
+      // change to how every page is served. Until then this stops an injected
+      // <script src="//evil"> even though it cannot stop an inline one.
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+
+      // Tailwind ships a stylesheet, but Next and Radix both set inline
+      // styles for layout and animation.
+      "style-src 'self' 'unsafe-inline'",
+
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data:",
+
+      // The app talks to its own API only. Everything else — Supabase,
+      // Upstash, Resend — is called from the server, never the browser.
+      "connect-src 'self'",
+
+      // The clickjacking defence that X-Frame-Options provides, in the form
+      // modern browsers actually prefer.
+      "frame-ancestors 'none'",
+      "form-action 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      'upgrade-insecure-requests',
+    ].join('; '),
+  },
 ];
 
 const nextConfig = {

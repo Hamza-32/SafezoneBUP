@@ -7,6 +7,7 @@ export const dynamic = 'force-dynamic';
 // loose for the same reason, and only exists to stop automated flooding.
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';
+import { deliverAlert, loadResponderRecipients } from '@/lib/notify';
 import {
   optionalUser,
   assertSameOrigin,
@@ -99,12 +100,11 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Raise an in-app notification for every responder.
+ * Record the report for every responder, and push it to them.
  *
- * This is in-app only. Nothing here sends a text message, an email or a push
- * notification, so a report is seen when a responder next opens the
- * dashboard. Connecting this to an external alerting channel is the main
- * outstanding requirement before this is relied on in a real emergency.
+ * The in-app row is the record; the email is what makes somebody look at it,
+ * since a dashboard nobody has open notifies nobody. Delivery is best effort
+ * and is skipped entirely when no provider is configured — see lib/notify.ts.
  */
 async function notifyResponders(report: {
   reportId: number;
@@ -146,6 +146,28 @@ async function notifyResponders(report: {
        VALUES ${placeholders}`,
       values
     );
+
+    // Awaited rather than fired and forgotten: a serverless function can be
+    // frozen the moment its response is returned, which would cut off an
+    // in-flight request. lib/notify caps this at four seconds and never
+    // throws.
+    const recipients = await loadResponderRecipients(Database.query.bind(Database));
+    const delivery = await deliverAlert(recipients, {
+      severity: 'emergency',
+      subject: `Emergency reported: ${report.category} at ${report.location}`,
+      lines: [
+        `A ${report.priority} priority ${report.category} emergency has been reported.`,
+        `Location: ${report.location}`,
+        'Open the SafezoneBUP dashboard to take ownership of this report.',
+      ],
+      reference: report.referenceId,
+    });
+
+    if (delivery.sent > 0) {
+      console.log(
+        `Emergency ${report.referenceId} delivered to ${delivery.sent} responder(s).`
+      );
+    }
   } catch (error) {
     // The report is already stored. A notification failure must not turn a
     // successful submission into an error for the person reporting.

@@ -16,6 +16,7 @@ import {
   serverErrorResponse,
 } from '@/lib/api-middleware';
 import { enforceRateLimit } from '@/lib/rate-limit';
+import { deliverAlert, loadResponderRecipients } from '@/lib/notify';
 import { parseBody, createCheckinSchema, updateCheckinSchema } from '@/lib/validation';
 import { sweepOverdueCheckins } from '@/lib/checkin-escalation';
 
@@ -209,10 +210,9 @@ export async function PUT(request: NextRequest) {
 /**
  * Fan an SOS out to staff as in-app notifications.
  *
- * This is the same delivery path the emergency report endpoint uses. It is
- * in-app only: nothing here sends a text message or an email, so an SOS is
- * seen when a responder next opens the dashboard. Wiring this to an SMS
- * provider is the outstanding piece of work for real deployments.
+ * This is the same delivery path the emergency report endpoint uses: an
+ * in-app row for the record, plus an email so somebody actually looks at it.
+ * Delivery is best effort and an SOS is recorded either way.
  */
 async function alertRespondersOfSos(checkin: {
   id: number;
@@ -252,6 +252,19 @@ async function alertRespondersOfSos(checkin: {
         )
       )
     );
+
+    const recipients = await loadResponderRecipients(Database.query.bind(Database));
+    await deliverAlert(recipients, {
+      severity: 'emergency',
+      subject: `SOS raised by ${name}`,
+      lines: [
+        `${name} raised an SOS from a safety check-in.`,
+        `Last known destination: ${checkin.location || 'not recorded'}.`,
+        reporter?.phoneNumber ? `Phone: ${reporter.phoneNumber}` : 'No phone number on file.',
+        'Open the SafezoneBUP dashboard for the full check-in.',
+      ],
+      reference: `check-in ${checkin.id}`,
+    });
   } catch (error) {
     // An SOS must still be recorded even if notifying responders fails.
     console.error(`Failed to notify responders of SOS on check-in ${checkin.id}:`, error);

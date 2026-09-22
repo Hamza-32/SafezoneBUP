@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 // Discussion Posts API - GET /api/discussion/posts
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';
+import { enforceRateLimit } from '@/lib/rate-limit';
 import { 
   successResponse,
   errorResponse,
@@ -75,6 +76,12 @@ export async function GET(request: NextRequest) {
 // Create new discussion post
 export async function POST(request: NextRequest) {
   return withAuth(request, async (req: NextRequest, user: any) => {
+    // Per account rather than per address: the board is anonymous to other
+    // readers, so the address alone would let one person behind a shared
+    // campus NAT exhaust everyone else's allowance.
+    const limited = await enforceRateLimit(request, 'discussion-post', 10, 60 * 60, String(user.id));
+    if (limited) return limited;
+
     try {
       const body = await request.json();
       const { title, content, categoryId, isAnonymous = true } = body;

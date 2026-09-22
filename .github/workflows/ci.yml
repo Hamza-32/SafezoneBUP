@@ -44,6 +44,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Unit tests
+        run: npm test
+
       - name: Security invariants
         # The 70 checks in scripts/verify-security-invariants.ts: role
         # escalation, ownership, URL handling, rate-limit configuration and

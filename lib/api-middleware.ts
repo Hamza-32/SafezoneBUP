@@ -4,6 +4,7 @@ import type { SignOptions } from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { Database } from './database';
 import { NextRequest, NextResponse } from 'next/server';
+import { reportError } from './observability';
 
 // ---------------------------------------------------------------------------
 // Configuration
@@ -486,6 +487,9 @@ export function errorResponse(error: string, status: number = 400, details?: any
  * response body.
  */
 export function serverErrorResponse(context: string, error: unknown, clientMessage: string) {
-  console.error(`${context}:`, error);
+  // Fire and forget: the caller is already returning a 500 and must not wait
+  // on a monitoring service. reportError logs synchronously before it ships,
+  // so nothing is lost if the process is frozen straight after this.
+  void reportError(error, { where: context });
   return errorResponse(clientMessage, 500);
 }

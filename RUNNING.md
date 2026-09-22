@@ -102,6 +102,7 @@ After that, an administrator can create further staff accounts by calling
 | ------------------------- | ------------------------------------------------------------- |
 | `npm run verify:security` | Authorization and validation checks. Needs no database.       |
 | `npm run verify:api`      | End-to-end checks against a running server and real database. |
+| `npm test`                | Unit tests (Vitest). No database, no network.                 |
 | `npm run verify:ratelimit`| Proves the configured rate-limit store is reachable and shared.|
 | `npm run admin:audit`     | Finds accounts using a password published in this repository. |
 | `npm run gen:secret`      | Prints a fresh value suitable for `JWT_SECRET`.               |
@@ -186,6 +187,50 @@ counting it per instance.
 Setting `RATE_LIMIT_REQUIRE_SHARED=true` reverses that, and requests get a
 503 while the store is unavailable. It is off by default and is not
 recommended here.
+
+## Alert delivery
+
+An emergency report, an SOS and an unconfirmed check-in each write a row to
+`notifications`. On their own, that means a responder sees them when they
+next open the dashboard — which at 3am is nobody.
+
+Setting a provider pushes them out as well. Email, not SMS: SMS has no free
+tier anywhere, and a responder's mail client raises a phone notification,
+which is most of what SMS would buy.
+
+### Set it up
+
+1. Sign up at [resend.com](https://resend.com). The free plan is 3,000 emails
+   a month and needs no card.
+2. Create an API key and set `RESEND_API_KEY`.
+3. Optionally set `ALERT_FROM`. Without a verified domain, use
+   `SafezoneBUP <onboarding@resend.dev>`, which Resend accepts as-is.
+
+Both go in `.env.local` and in the Vercel project settings.
+
+### What happens without it
+
+Every alert is still recorded, and the dashboard still shows it. The
+application logs a warning every fifteen minutes so the gap is visible rather
+than silent. Nothing fails.
+
+That degradation is deliberate. Refusing to file an emergency report because
+an email provider is unreachable would be a far worse failure than a late
+notification, so delivery is capped at four seconds and never propagates an
+error to the reporter.
+
+## Error reporting
+
+Failures are written with `console.error` and, when `SENTRY_DSN` is set, sent
+to Sentry as well. The free plan covers 5,000 errors a month.
+
+The error page shows visitors a reference code. Without a collector that code
+identifies an event nobody can look up, which is the gap this closes.
+
+Get the DSN from Sentry under Project Settings, Client Keys, and set
+`SENTRY_DSN`. There is no SDK dependency: the ingest API is plain HTTP and
+`lib/observability.ts` speaks it directly, the same way the rate limiter
+speaks to Redis.
 
 ## Safety check-in escalation
 

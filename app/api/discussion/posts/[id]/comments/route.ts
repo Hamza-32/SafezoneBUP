@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic';
 // Discussion Comments API - POST /api/discussion/posts/[id]/comments
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';
+import { enforceRateLimit } from '@/lib/rate-limit';
 import { 
   successResponse,
   errorResponse,
@@ -14,6 +15,17 @@ export async function POST(
   { params }: { params: { id: string } }
 ) {
   return withAuth(request, async (req: NextRequest, user: any) => {
+    // A higher allowance than posting: a conversation is many short replies,
+    // where a new thread is not.
+    const limited = await enforceRateLimit(
+      request,
+      'discussion-comment',
+      30,
+      60 * 60,
+      String(user.id)
+    );
+    if (limited) return limited;
+
     try {
       const postId = params.id;
       const body = await request.json();

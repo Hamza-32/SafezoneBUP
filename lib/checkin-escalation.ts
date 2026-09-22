@@ -16,6 +16,7 @@
 //     scheduler at all still escalates, late rather than never.
 
 import { Database } from './database';
+import { deliverAlert, loadResponderRecipients } from './notify';
 
 /**
  * How long after the expected arrival time to wait before escalating.
@@ -69,9 +70,11 @@ export async function escalateOverdueCheckins(): Promise<EscalationResult> {
   const responders = await Database.query(
     "SELECT id FROM users WHERE role IN ('admin', 'security')"
   );
+  const recipients = await loadResponderRecipients(Database.query.bind(Database));
 
   let escalated = 0;
   let notified = 0;
+  const pushed: string[] = [];
 
   for (const checkin of overdue) {
     // Claim the row first. If another caller got there first this updates
@@ -117,11 +120,31 @@ export async function escalateOverdueCheckins(): Promise<EscalationResult> {
         )
       );
       notified += responders.length;
+      pushed.push(`${name} (check-in ${checkin.id})`);
     } catch (error) {
       // The status change stands even if the notification insert fails; the
       // check-in is visibly 'missed' on the dashboard either way.
       console.error(`Failed to notify responders about check-in ${checkin.id}:`, error);
     }
+  }
+
+  // One email covering the whole pass rather than one per check-in. A sweep
+  // that finds several overdue at once is usually an outage catching up, and
+  // a burst of separate mails would be read as noise.
+  if (pushed.length > 0) {
+    await deliverAlert(recipients, {
+      severity: 'warning',
+      subject:
+        pushed.length === 1
+          ? 'A safety check-in was not confirmed'
+          : `${pushed.length} safety check-ins were not confirmed`,
+      lines: [
+        'The following people set an expected arrival time and did not confirm ' +
+          'arriving:',
+        ...pushed,
+        'Open the SafezoneBUP dashboard for their destination and contact details.',
+      ],
+    });
   }
 
   return { examined: overdue.length, escalated, notified };
