@@ -39,6 +39,7 @@ const ROUTES = [
   const browser = await chromium.launch({ channel: 'chrome' });
   const context = await browser.newContext({ viewport: { width: 1440, height: 1100 } });
   const totals = new Map();
+  let blank = 0;
 
   for (const route of ROUTES) {
     const page = await context.newPage();
@@ -49,6 +50,24 @@ const ROUTES = [
       await page.waitForTimeout(600);
     }
     await page.waitForTimeout(2000);
+
+    // A page that failed to render has nothing to violate, so axe reports a
+    // clean pass. That is how a broken dev server once produced a perfect
+    // score here. Refuse to grade a page that clearly did not load.
+    const rendered = await page.evaluate(() => ({
+      text: document.body.innerText.replace(/\s+/g, ' ').trim().length,
+      controls: document.querySelectorAll('button, a, input').length,
+    }));
+
+    if (rendered.text < 100 || rendered.controls < 3) {
+      console.error(
+        `${route.name.padEnd(17)} DID NOT RENDER (${rendered.text} chars, ` +
+          `${rendered.controls} controls). Is the dev server healthy?`
+      );
+      blank += 1;
+      await page.close();
+      continue;
+    }
 
     const results = await new AxeBuilder({ page })
       .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'])

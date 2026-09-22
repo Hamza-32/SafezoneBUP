@@ -1,270 +1,212 @@
-# SafeZone Campus Safety Platform
+# SafezoneBUP
 
-A comprehensive campus safety platform built with Next.js, featuring user authentication, emergency reporting, and administrative dashboards.
+A campus safety platform for Bangladesh University of Professionals. Students
+report emergencies — with or without an account — and campus security is
+notified immediately, by email as well as in the app.
 
-## 🚀 Features
+[![CI](https://github.com/Hamza-32/SafezoneBUP/actions/workflows/ci.yml/badge.svg)](https://github.com/Hamza-32/SafezoneBUP/actions/workflows/ci.yml)
+&nbsp;![Next.js](https://img.shields.io/badge/Next.js-14-000000?logo=next.js&logoColor=white)
+&nbsp;![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+&nbsp;![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
 
-- **User Authentication**: Secure signup and login for students and administrators
-- **Emergency Reporting**: Quick emergency request submission (with or without login)
-- **Complaint System**: Structured complaint filing and tracking
-- **Role-based Dashboards**: Separate interfaces for students and administrators
-- **Profile Management**: User verification and profile updates
-- **In-app Notifications**: Responders are notified of reports, SOS alerts and unconfirmed check-ins
-- **Responsive Design**: Mobile-friendly interface with modern UI components
+**[Live deployment →](https://safezone-bup.vercel.app)**
 
-## 🛠 Tech Stack
-
-- **Frontend**: Next.js 14, React, TypeScript
-- **Styling**: Tailwind CSS, shadcn/ui components
-- **Backend**: Next.js API Routes
-- **Database**: PostgreSQL (Supabase)
-- **Authentication**: JWT tokens
-- **Notifications**: Sonner toast library
-- **UI**: React 18, TypeScript, Tailwind CSS, Radix UI
-- **Security**: bcryptjs for password hashing
-- **Validation**: Zod for form validation
-
-## 📋 Prerequisites
-
-- Node.js 20+ and npm
-- A PostgreSQL database. A free Supabase project is the intended setup and needs nothing installed locally.
-- Git
-
-## ⚙️ Installation & Setup
-
-### 1. Clone the Repository
-```bash
-git clone <repository-url>
-cd SafezoneBUP
-```
-
-### 2. Install Dependencies
-```bash
-npm install
-```
-
-### 3. Database Setup
-
-Create a free [Supabase](https://supabase.com) project, then:
-
-```bash
-cp .env.example .env.local
-```
-
-Edit `.env.local`:
-
-```env
-# Project Settings -> Database -> Connection string. Use the POOLER string,
-# not the direct connection: it is what lets many short-lived serverless
-# functions share a small number of real connections.
-DATABASE_URL=postgresql://...@aws-0-<region>.pooler.supabase.com:6543/postgres
-
-# Supabase's pooler presents a certificate Node does not trust by default.
-# Download it from Project Settings -> Database -> SSL Configuration.
-DB_SSL_CA_FILE=supabase-ca.crt
-
-# Generate with: npm run gen:secret
-# A template placeholder is rejected outright, not merely warned about.
-JWT_SECRET=
-```
-
-**Important**: URL-encode the database password if it contains any of `@ : / ? # %`.
-
-### 4. Initialize Database
-```bash
-# Create the tables, run migrations and seed sample data
-npm run db:init
-```
-
-### 5. Start Development Server
-```bash
-npm run dev
-```
-
-The application will be available at `http://localhost:3000`
-   ```
-
-## Development
-
-1. **Start the development server**
-
-   ```bash
-   npm run dev
-   ```
-   
-   The application will be available at <http://localhost:3000>
-
-2. **Build for production**
-
-   ```bash
-   npm run build
-   npm start
-   ```
-
-## 📁 Project Structure
-
-```
-SafezoneBUP/
-├── app/                      # Next.js app directory
-│   ├── api/                  # API routes
-│   │   ├── auth/            # Authentication endpoints
-│   │   └── health/          # Health check endpoint
-│   ├── globals.css          # Global styles
-│   ├── layout.tsx           # Root layout
-│   └── page.tsx             # Home page
-├── components/              # React components
-│   ├── auth/                # Authentication components
-│   ├── dashboards/          # Dashboard components
-│   ├── emergency/           # Emergency reporting components
-│   ├── pages/               # Page components
-│   ├── profile/             # Profile management components
-│   └── ui/                  # Reusable UI components
-├── lib/                     # Utility libraries
-│   ├── api-client.ts        # API client for frontend
-│   ├── api-middleware.ts    # API utilities and middleware
-│   ├── database.ts          # Database connection and utilities
-│   └── utils.ts             # General utilities
-├── scripts/                 # Verification and maintenance scripts
-│   ├── verify-security-invariants.ts  # 70 offline security checks
-│   ├── verify-api.ts                  # End-to-end checks
-│   ├── verify-rate-limit.ts           # Shared rate-limit store
-│   └── admin-password.ts              # Audit and rotate passwords
-└── public/                  # Static assets
-```
-
-## 🔧 Available Scripts
-
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run start` - Start production server
-- `npm run lint` - Run ESLint
-- `npm run db:setup` - Initialize database with tables and sample data
-- `npm run db:seed` - Add sample data to existing database
-- `npm run test:api` - Test API endpoints
-
-## 🎯 Usage
-
-### For Students:
-1. **Sign Up**: Create a student account with your student ID
-2. **Dashboard**: Access your personalized student dashboard
-3. **Emergency Reporting**: Submit emergency requests quickly
-4. **File Complaints**: Submit and track complaints
-5. **Profile**: Manage your profile and verification status
-
-### For Administrators:
-1. **Admin Access**: Sign up with administrator privileges
-2. **Admin Dashboard**: View and manage all reports and complaints
-3. **User Management**: Monitor user activity and verification
-4. **Emergency Response**: Handle emergency requests efficiently
-
-### Emergency Access:
-- Emergency reporting is available without login for urgent situations
-- Quick access through the "Report without login" option on the login page
-
-## 🔐 API Endpoints
-
-### Authentication
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
-
-### Health Check
-- `GET /api/health` - Application and database health status
-
-## 🗄️ Database Schema
-
-The application uses the following main tables:
-- `users` - User accounts and profiles
-- `emergency_requests` - Emergency reports
-- `complaints` - Complaint submissions
-- `activity_logs` - System activity tracking
-
-## 🚨 Important Notes
-
-1. **Environment Variables**: Always quote database passwords containing special characters
-2. **Security**: Change the JWT_SECRET in production
-3. **Database**: Supabase is hosted, so there is no local server to start. A paused free project wakes on the first request.
-4. **Ports**: The application will automatically find an available port if 3000 is in use
-
-## 🐛 Troubleshooting
-
-### Common Issues:
-
-1. **Database Connection Errors**:
-   - Verify database credentials in `.env.local`
-   - Check `DATABASE_URL` points at the pooler and the project is not paused
-   - Check if database exists and is accessible
-
-2. **Environment Variable Issues**:
-   - Ensure `.env.local` is in the root directory
-   - Quote password values containing special characters
-   - Restart the development server after environment changes
-
-3. **Port Conflicts**:
-   - The application will automatically use ports 3001, 3002, etc. if 3000 is unavailable
-   - Check the terminal output for the actual port being used
-
-4. **Build Errors**:
-   - Run `npm install` to ensure all dependencies are installed
-   - Check for TypeScript errors with `npm run lint`
-
-## 🔄 Development Workflow
-
-1. **Database Changes**: Update scripts in `/scripts/` directory
-2. **API Changes**: Modify routes in `/app/api/` directory
-3. **Frontend Changes**: Update components in `/components/` directory
-4. **Styling**: Use Tailwind CSS classes and shadcn/ui components
-
-## 📞 Support
-
-For issues, questions, or contributions, please refer to the project documentation or contact the development team.
+![SafezoneBUP home page](docs/screenshots/home.png)
 
 ---
 
-**SafeZone** - Making campus safety accessible and efficient for everyone. 🏫🛡️
-- SQL injection protection through parameterized queries
-- CORS configured for secure cross-origin requests
-- Input validation and sanitization
+## What it does
 
-## Monitoring
+| | |
+| --- | --- |
+| **Emergency reporting** | Submit in seconds, signed in or not. Optional GPS. Every responder on duty is notified the moment it lands, and a reference code lets the reporter follow it to resolution. |
+| **Safety check-in** | Say where you are going and when you expect to arrive. If you never confirm, responders are told automatically. |
+| **SOS** | One control on an active check-in. Latched: once raised it cannot be silently retracted. |
+| **Complaints** | Structured filing with optional anonymity and status tracking. |
+| **Lost & found** | A public board. Contact details are released only to signed-in users, so it cannot be scraped for phone numbers. |
+| **Discussion board** | Moderated, anonymous peer support. |
+| **Safety resources** | Verified emergency numbers and campus guidance. |
 
-The application includes:
-- Audit logging for all user actions
-- Error tracking and logging
-- Performance monitoring
-- Database connection health checks
+Two dashboards sit behind it: students see their own reports, staff see
+everything with ownership and status.
 
-## Deployment
+<details>
+<summary>More screenshots</summary>
 
-For production deployment:
+**Dark mode**
 
-1. Set up a production PostgreSQL database (Supabase)
-2. Update environment variables for production
-3. Build the application: `npm run build`
-4. Start the production servers: `npm start`
-5. Configure reverse proxy (nginx recommended)
-6. Set up SSL certificates
-7. Configure monitoring and logging
+![Dark mode](docs/screenshots/home-dark.png)
 
-## Troubleshooting
+**Emergency report**
 
-### Common Issues
+![Emergency reporting](docs/screenshots/emergency.png)
 
-1. **Database Connection Error**
-   - Check the Supabase project is awake and `DATABASE_URL` is correct
-   - Verify database credentials in `.env`
-   - Ensure database exists
+**Lost and found**
 
-2. **Port Already in Use**
-   - Change ports in `.env` file
-   - Kill existing processes using the ports
+![Lost and found](docs/screenshots/lost-and-found.png)
 
-3. **Authentication Issues**
-   - Check JWT_SECRET in environment variables
-   - Verify token expiration settings
+</details>
 
-4. **Build Errors**
-   - Clear node_modules and reinstall dependencies
-   - Check TypeScript configuration
-   - Verify all imports are correct
+---
 
-For more detailed troubleshooting, check the application logs and error messages.
+## Design decisions worth explaining
+
+These are the parts of the codebase where the obvious approach was not the
+one taken.
+
+**Alerts are delivered, not just recorded.** Writing a row to a
+`notifications` table means a responder learns about an emergency when they
+next open the dashboard, which at 3am is nobody. `lib/notify.ts` sends email
+on top of the database row. Email rather than SMS because SMS has no free
+tier, and a mail client raises a phone notification anyway. Delivery is
+capped at four seconds and cannot fail the report that triggered it —
+refusing to file an emergency because an email provider is down would be a
+far worse failure than a late notification.
+
+**Rate limits are shared, and provably so.** In-memory counters are
+meaningless on serverless: each instance counts separately and cold starts
+reset them, so the real limit is the configured one times however many
+instances are alive. Counters live in Redis over its REST API, with no client
+library. `npm run verify:ratelimit` proves it against the real store by
+clearing the in-memory counters between calls, so anything that still
+accumulates had to come back from Redis.
+
+**Degradation is deliberate, everywhere.** No rate-limit store, no email
+provider and no error collector each degrade to something that still works,
+log the gap on a repeating interval, and never reject a request. A single
+line at boot is indistinguishable from a healthy deployment once it scrolls
+away, which is how a system ends up silently unprotected.
+
+**Anonymity is enforced server-side.** The API strips any `userId` or `role`
+a client sends and takes identity from the session. Self-registration cannot
+choose a role. Contact details on the lost and found board are withheld from
+anonymous callers by the endpoint, not hidden by the interface.
+
+**Types describe what the API returns, not what is convenient.** A crash in
+Lost & Found traced back to a type declaring a nullable field as always
+present, so TypeScript never questioned the dereference. Making three such
+types honest surfaced two more latent crashes the compiler could then catch.
+
+**No claim in the interface that the code cannot support.** The landing page
+once advertised a response time, a user count and real-time tracking. None
+were measured and none existed. On a safety page an invented response time is
+something a person might rely on.
+
+---
+
+## Stack
+
+Next.js 14 (App Router) · TypeScript · PostgreSQL via Supabase · Tailwind and
+shadcn/ui · JWT in an httpOnly cookie · bcrypt · Zod · Redis for shared rate
+limiting · Vitest.
+
+Deployed on Vercel. Every third-party service is on a free tier.
+
+---
+
+## Quality
+
+| | |
+| --- | --- |
+| **47** unit tests | Vitest. No database, no network. |
+| **70** security invariants | Role escalation, record ownership, URL handling, rate-limit configuration, endpoint authentication. |
+| **39** end-to-end checks | Against a real database. Creates throwaway accounts and removes them. |
+| **0** accessibility violations | axe-core, WCAG 2.1 A and AA, across all ten pages. |
+
+```bash
+npm test                  # unit tests
+npm run verify:security   # invariants, offline
+npm run verify:api        # end to end, needs a running server
+npm run verify:a11y       # axe-core, needs a running server
+npm run verify:ratelimit  # proves the shared rate-limit store works
+```
+
+The first two run on every push, alongside typecheck, lint and a production
+build, on Node 20 and 22.
+
+Everything asserted in `verify:security` is a rule that was broken at some
+point in this repository, so a failure means a regression rather than a style
+disagreement.
+
+---
+
+## Security
+
+- Passwords hashed with bcrypt at cost 12; login timing is equalised against
+  a decoy hash so a wrong address and a wrong password take the same time
+- Session in an httpOnly, `SameSite=Lax`, secure cookie; the user record is
+  re-read on every request, so a role change or deletion takes effect at once
+  rather than when the token expires
+- Every query parameterised; no helper interpolates request data into SQL
+- Rate limiting on every user-facing write, keyed per account where the
+  endpoint is anonymous to other readers
+- A JWT secret that is missing, short, or matches a known template is refused
+  outright in production rather than warned about
+- Six security headers including a Content-Security-Policy
+- Demonstration accounts, which share a published password, cannot be seeded
+  into production without an explicit opt-in
+
+---
+
+## Running it
+
+```bash
+npm install
+cp .env.example .env.local   # set DATABASE_URL and JWT_SECRET
+npm run db:init              # schema, migrations and sample data
+npm run dev
+```
+
+[QUICKSTART.md](QUICKSTART.md) has the five-minute version.
+[RUNNING.md](RUNNING.md) covers deployment, the shared rate-limit store,
+check-in escalation, alert delivery and error reporting.
+
+---
+
+## Structure
+
+```
+app/
+  api/            24 route handlers
+  error.tsx       error boundaries, which carry the emergency number
+components/
+  ui/             shadcn primitives
+  safety/         check-in, lost and found, resources, discussion
+  emergency/      emergency and complaint forms
+  dashboards/     student and staff views
+lib/
+  database.ts             pg pool, with a MySQL-to-PostgreSQL compatibility layer
+  api-middleware.ts       auth, authorisation, response helpers
+  rate-limit.ts           shared and in-memory limiters
+  notify.ts               out-of-band alert delivery
+  observability.ts        error reporting
+  checkin-escalation.ts   escalates unconfirmed check-ins
+  validation.ts           Zod schemas
+scripts/                  verification and maintenance
+tests/                    Vitest
+```
+
+---
+
+## Status
+
+A working prototype, deployed and exercised end to end, not a system a
+university currently runs on.
+
+Known gaps, all documented rather than hidden:
+
+- **BUP's own extension numbers are absent.** 999 and the university main
+  line are verified against published sources; campus security and medical
+  extensions are not published anywhere, and inventing them would be worse
+  than omitting them.
+- **Check-in escalation needs an external scheduler.** Vercel's free plan
+  fires cron once a day, far too coarse. Without one, escalation falls back
+  to a sweep when a responder loads the dashboard.
+- **`script-src` still allows `'unsafe-inline'`**, because Next.js inlines its
+  hydration bootstrap. Tightening it means issuing a nonce from middleware.
+
+---
+
+## Licence
+
+MIT. See [LICENSE](LICENSE).

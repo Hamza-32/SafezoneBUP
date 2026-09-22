@@ -105,6 +105,12 @@ After that, an administrator can create further staff accounts by calling
 | `npm test`                | Unit tests (Vitest). No database, no network.                 |
 | `npm run verify:ratelimit`| Proves the configured rate-limit store is reachable and shared.|
 | `npm run verify:a11y`     | axe-core against every page, WCAG 2.1 A and AA.               |
+
+`verify:a11y` and `verify:api` both need `npm run dev` running. Do not run
+`npm run build` while it is: the build overwrites `.next`, the dev server
+then 404s its own chunks, and every page renders blank. `verify:a11y` refuses
+to grade a page that did not render, rather than reporting a clean sweep of
+nothing, but the simpler rule is to build and serve in separate sessions.
 | `npm run admin:audit`     | Finds accounts using a password published in this repository. |
 | `npm run gen:secret`      | Prints a fresh value suitable for `JWT_SECRET`.               |
 
