@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { FilterBar } from '@/components/ui/filter-bar';
 import { Search, Phone, Mail, ExternalLink, AlertTriangle, Heart, Shield, HelpCircle, Building } from 'lucide-react';
 import apiClient from '@/lib/api-client';
 
@@ -130,15 +130,16 @@ export default function SafetyResourceHub() {
           </div>
         </div>
 
-        <Tabs value={selectedCategory} onValueChange={setSelectedCategory}>
-          <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
-            {categories.map((category) => (
-              <TabsTrigger key={category.value} value={category.value} className="text-xs">
-                {category.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+        <FilterBar
+          label="Filter resources by category"
+          options={categories.map((category) => ({
+            value: category.value,
+            label: category.label,
+          }))}
+          value={selectedCategory}
+          onChange={setSelectedCategory}
+          className="flex-wrap"
+        />
       </div>
 
       <div className="grid gap-4">

@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { FilterBar } from '@/components/ui/filter-bar';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Search, Plus, MapPin, Calendar, Phone, Mail, Eye, EyeOff, Package, CheckCircle, Lock } from 'lucide-react';
@@ -244,7 +244,7 @@ export default function LostAndFound() {
               <div>
                 <label className="text-sm font-medium">Type</label>
                 <Select value={newItem.type} onValueChange={(value: 'lost' | 'found') => setNewItem({...newItem, type: value})}>
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Lost or found">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -266,7 +266,7 @@ export default function LostAndFound() {
               <div>
                 <label className="text-sm font-medium">Category *</label>
                 <Select value={newItem.category} onValueChange={(value) => setNewItem({...newItem, category: value})}>
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Item category">
                     <SelectValue placeholder="Select a category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -352,7 +352,7 @@ export default function LostAndFound() {
                     contactInfo: {...newItem.contactInfo, preferredContact: value}
                   })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Preferred contact method">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -400,7 +400,7 @@ export default function LostAndFound() {
             />
           </div>
           <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger className="w-full sm:w-48">
+            <SelectTrigger className="w-full sm:w-48" aria-label="Filter by category">
               <SelectValue placeholder="All Categories" />
             </SelectTrigger>
             <SelectContent>
@@ -414,13 +414,16 @@ export default function LostAndFound() {
           </Select>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="all">All Items</TabsTrigger>
-            <TabsTrigger value="lost">Lost Items</TabsTrigger>
-            <TabsTrigger value="found">Found Items</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        <FilterBar
+          label="Filter by lost or found"
+          options={[
+            { value: 'all', label: 'All Items' },
+            { value: 'lost', label: 'Lost Items' },
+            { value: 'found', label: 'Found Items' },
+          ]}
+          value={activeTab}
+          onChange={setActiveTab}
+        />
       </div>
 
       {/* Items List */}

@@ -20,9 +20,14 @@
     --secondary: 0 0% 96%;
     --secondary-foreground: 0 0% 10%;
     
-    /* Muted */
+    /* Muted.
+       
+       45% lightness is a common default and fails WCAG AA against the muted
+       surface it most often sits on: #737373 on #f5f5f5 is 4.31:1, under the
+       4.5:1 floor for body text. 40% clears it on both white and the muted
+       background. axe reported 18 failing nodes at the old value. */
     --muted: 0 0% 96%;
-    --muted-foreground: 0 0% 45%;
+    --muted-foreground: 0 0% 40%;
     
     /* Accent - BUP Green */
     --accent: 162 48% 20%;

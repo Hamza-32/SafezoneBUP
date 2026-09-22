@@ -12,6 +12,7 @@
     "verify:security": "tsx scripts/verify-security-invariants.ts",
     "verify:api": "tsx scripts/verify-api.ts",
     "verify:ratelimit": "tsx scripts/verify-rate-limit.ts",
+    "verify:a11y": "node scripts/verify-accessibility.js",
     "admin:audit": "tsx scripts/admin-password.ts audit",
     "admin:password": "tsx scripts/admin-password.ts set",
     "gen:secret": "node -e \"console.log(require('crypto').randomBytes(48).toString('hex'))\"",
@@ -84,6 +85,7 @@
     "zod": "^3.25.67"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.17",
     "@types/jsonwebtoken": "^9.0.10",
@@ -94,6 +96,7 @@
     "eslint": "^8.57.1",
     "eslint-config-next": "^14.2.35",
     "nodemon": "^3.1.10",
+    "playwright": "^1.63.0",
     "postcss": "^8.5",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.20.3",

@@ -177,6 +177,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
                 variant="ghost" 
                 size="icon"
                 className="lg:hidden"
+                aria-label="Close menu"
                 onClick={() => setSidebarOpen(false)}
               >
                 <X className="h-5 w-5" />
@@ -215,7 +216,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
                 </p>
                 <p className="text-xs text-muted-foreground">Administrator</p>
               </div>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
+              <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Sign out">
                 <LogOut className="h-4 w-4" />
               </Button>
             </div>
@@ -233,6 +234,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
                 variant="ghost" 
                 size="icon"
                 className="lg:hidden"
+                aria-label="Open menu"
                 onClick={() => setSidebarOpen(true)}
               >
                 <Menu className="h-5 w-5" />
@@ -251,7 +253,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
                 <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                 <Input placeholder="Search reports..." className="pl-9 w-64" />
               </div>
-              <Button variant="ghost" size="icon" className="relative">
+              <Button variant="ghost" size="icon" className="relative" aria-label="Notifications">
                 <Bell className="h-5 w-5" />
                 <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
@@ -260,7 +262,7 @@ export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full">
+                  <Button variant="ghost" size="icon" className="rounded-full" aria-label="Account menu">
                     <div className="h-8 w-8 rounded-full bg-accent/10 flex items-center justify-center">
                       <User className="h-4 w-4 text-accent" />
                     </div>
@@ -521,15 +523,15 @@ export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
                         </td>
                         <td className="py-4 px-4 text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="View details">
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Edit">
                               <Edit className="h-4 w-4" />
                             </Button>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8">
+                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="More actions">
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>

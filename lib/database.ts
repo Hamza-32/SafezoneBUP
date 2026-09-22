@@ -415,95 +415,15 @@ class Database {
     }
   }
 
-  /** Returns the first row, or null. */
-  static async findOne(sql: string, params: any[] = []): Promise<any> {
-    const results = await this.query(sql, params);
-    return results.length > 0 ? results[0] : null;
-  }
+  // A previous revision carried exists/count/insert/update/delete helpers
+  // that interpolated a table name and a raw SQL `condition` string. Nothing
+  // ever called them. They were guarded by an identifier pattern and a
+  // comment telling callers never to build a condition from request data,
+  // which is exactly the kind of rule that holds until someone in a hurry
+  // reaches for the convenient-looking helper. Removed rather than
+  // documented harder: every call site writes its own parameterised SQL, and
+  // an injection sink that does not exist cannot be misused.
 
-  // The helpers below interpolate table and column names, because a
-  // placeholder cannot stand in for an identifier. Identifiers are checked
-  // against a strict pattern first.
-  //
-  // The `condition` argument is raw SQL. It must always be a literal written
-  // in the calling code, with every value passed through `params`. Never
-  // build a condition from request data.
-
-  private static assertIdentifier(name: string, kind: string): void {
-    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
-      throw new Error(`Unsafe ${kind} name: ${JSON.stringify(name)}`);
-    }
-  }
-
-  static async exists(table: string, condition: string, params: any[] = []): Promise<boolean> {
-    this.assertIdentifier(table, 'table');
-
-    const result = await this.findOne(
-      `SELECT 1 FROM ${table} WHERE ${condition} LIMIT 1`,
-      params
-    );
-
-    return !!result;
-  }
-
-  static async count(table: string, condition: string = 'TRUE', params: any[] = []): Promise<number> {
-    this.assertIdentifier(table, 'table');
-
-    const result = await this.findOne(
-      `SELECT COUNT(*) as count FROM ${table} WHERE ${condition}`,
-      params
-    );
-
-    // COUNT returns bigint, which the driver hands back as a string.
-    return result ? Number(result.count) : 0;
-  }
-
-  static async insert(table: string, data: Record<string, any>): Promise<number> {
-    this.assertIdentifier(table, 'table');
-
-    const columns = Object.keys(data);
-    columns.forEach((column) => this.assertIdentifier(column, 'column'));
-
-    const values = Object.values(data);
-    const placeholders = columns.map(() => '?').join(', ');
-
-    const result = await this.query(
-      `INSERT INTO ${table} (${columns.join(', ')}) VALUES (${placeholders})`,
-      values
-    );
-
-    return result.insertId as number;
-  }
-
-  static async update(
-    table: string,
-    data: Record<string, any>,
-    condition: string,
-    params: any[] = []
-  ): Promise<number> {
-    this.assertIdentifier(table, 'table');
-
-    const columns = Object.keys(data);
-    columns.forEach((column) => this.assertIdentifier(column, 'column'));
-
-    const updates = columns.map((key) => `${key} = ?`).join(', ');
-    const values = [...Object.values(data), ...params];
-
-    const result = await this.query(
-      `UPDATE ${table} SET ${updates} WHERE ${condition}`,
-      values
-    );
-
-    return result.affectedRows;
-  }
-
-  static async delete(table: string, condition: string, params: any[] = []): Promise<number> {
-    this.assertIdentifier(table, 'table');
-
-    const result = await this.query(`DELETE FROM ${table} WHERE ${condition}`, params);
-
-    return result.affectedRows;
-  }
 }
 
 // ---------------------------------------------------------------------------

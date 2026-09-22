@@ -232,7 +232,7 @@ export default function SafetyCheckin() {
               <div>
                 <label className="text-sm font-medium">Emergency Contact</label>
                 <Select value={newCheckin.emergencyContactId} onValueChange={(value) => setNewCheckin({...newCheckin, emergencyContactId: value})}>
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Emergency contact">
                     <SelectValue placeholder="Select an emergency contact" />
                   </SelectTrigger>
                   <SelectContent>

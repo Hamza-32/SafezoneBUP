@@ -12,6 +12,24 @@ const BCRYPT_ROUNDS = 12;
  * value comes from SEED_ADMIN_PASSWORD when set, and is otherwise random and
  * printed once for the operator to save.
  */
+/**
+ * Whether to create the demonstration accounts.
+ *
+ * They share a password that is published in this repository, so they are
+ * refused outside development unless explicitly requested. An opt-in is the
+ * right shape here: someone seeding a demo environment can ask for them,
+ * and nobody can create them in production by accident.
+ */
+export function shouldSeedDemoAccounts(): boolean {
+  const requested = process.env.SEED_DEMO_ACCOUNTS;
+
+  if (requested !== undefined) {
+    return requested === '1' || /^(true|yes|on)$/i.test(requested);
+  }
+
+  return process.env.NODE_ENV !== 'production';
+}
+
 function resolveSeedAdminPassword(): { password: string; generated: boolean } {
   const provided = process.env.SEED_ADMIN_PASSWORD;
 
@@ -64,9 +82,19 @@ export const seedData = async () => {
       console.log('   Seeded administrator admin@bup.edu.bd using SEED_ADMIN_PASSWORD.');
     }
 
-    // Create sample student users. These are demonstration accounts, so the
-    // password is intentionally simple and is safe only because these rows
-    // should never exist in a production database.
+    // Demonstration accounts. The password below is published in this
+    // repository, so these rows must never reach a real deployment.
+    //
+    // That used to be asserted only by this comment, which is not a control:
+    // one `npm run db:seed` against production would have created four
+    // accounts on a password anyone reading the repo knows. It is now
+    // refused, and has to be asked for explicitly to happen at all.
+    if (!shouldSeedDemoAccounts()) {
+      console.log(
+        '   Skipping demonstration accounts: they use a password published in ' +
+          'this repository. Set SEED_DEMO_ACCOUNTS=true to create them anyway.'
+      );
+    } else {
     const studentPassword = await bcrypt.hash('student123', BCRYPT_ROUNDS);
     const students = [
       {
@@ -252,7 +280,10 @@ export const seedData = async () => {
         notification.relatedId,
         notification.relatedType
       ]);
-    }    // Create emergency contacts
+    }
+    } // end of demonstration accounts and their sample content
+
+    // Create emergency contacts
     // Only numbers that can be checked against a public source are seeded.
     //
     // The previous list invented a +88024-9870-57xx range for campus security,

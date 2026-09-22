@@ -213,6 +213,7 @@ export default function EmergencyRequest({ onNavigate }: EmergencyRequestProps) 
             <Button 
               variant="ghost" 
               size="icon"
+              aria-label="Go back"
               className="text-primary-foreground hover:bg-white/10"
               onClick={() => onNavigate("login")}
             >
@@ -380,6 +381,7 @@ export default function EmergencyRequest({ onNavigate }: EmergencyRequestProps) 
                   </div>
                   <Switch
                     id="isForSomeoneElse"
+                    aria-label="Reporting on behalf of someone else"
                     checked={formData.isForSomeoneElse}
                     onCheckedChange={(checked) => setFormData({ ...formData, isForSomeoneElse: checked })}
                   />
@@ -404,6 +406,7 @@ export default function EmergencyRequest({ onNavigate }: EmergencyRequestProps) 
                     </div>
                     <Switch
                       id="isAnonymous"
+                      aria-label="Submit this report anonymously"
                       checked={formData.isAnonymous}
                       onCheckedChange={(checked) => setFormData({ ...formData, isAnonymous: checked })}
                     />

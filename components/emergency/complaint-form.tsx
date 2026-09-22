@@ -170,7 +170,7 @@ export default function ComplaintForm({ onNavigate }: ComplaintFormProps) {
                   onValueChange={(value) => setFormData({ ...formData, complaintType: value })}
                   required
                 >
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Complaint type">
                     <SelectValue placeholder="Select complaint type" />
                   </SelectTrigger>
                   <SelectContent>
@@ -253,6 +253,7 @@ export default function ComplaintForm({ onNavigate }: ComplaintFormProps) {
               <div className="flex items-center space-x-2">
                 <Switch
                   id="isAnonymous"
+                  aria-label="Submit this complaint anonymously"
                   checked={formData.isAnonymous}
                   onCheckedChange={(checked) => setFormData({ ...formData, isAnonymous: checked })}
                 />

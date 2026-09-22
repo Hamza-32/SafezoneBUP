@@ -59,7 +59,7 @@ export function Navbar({ user, onNavigate, onLogout }: NavbarProps) {
                 variant="ghost"
                 size="sm"
                 onClick={() => onNavigate(item.page)}
-                className="text-muted-foreground hover:text-foreground"
+                className="text-muted-foreground"
               >
                 {item.label}
               </Button>
@@ -78,7 +78,7 @@ export function Navbar({ user, onNavigate, onLogout }: NavbarProps) {
             {/* Safety Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                <Button variant="ghost" size="sm" className="text-muted-foreground">
                   Safety Tools
                   <ChevronDown className="h-4 w-4 ml-1" />
                 </Button>

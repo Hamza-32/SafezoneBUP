@@ -179,7 +179,7 @@ export default function AnonymousDiscussionBoard() {
               <div>
                 <label className="text-sm font-medium">Category</label>
                 <Select value={newPost.categoryId} onValueChange={(value) => setNewPost({...newPost, categoryId: value})}>
-                  <SelectTrigger>
+                  <SelectTrigger aria-label="Discussion category">
                     <SelectValue placeholder="Select a category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -293,7 +293,22 @@ export default function AnonymousDiscussionBoard() {
                     </div>
                   </div>
                   {post.categoryName && (
-                    <Badge style={{ backgroundColor: post.categoryColor }}>
+                    // The category colour comes from the database, so nothing
+                    // guarantees white text is readable on it: the seeded
+                    // green and amber measured 2.53:1 and 2.14:1 against
+                    // white, both well under the 4.5:1 floor. Using the
+                    // colour as a dot and border instead of a fill keeps it
+                    // recognisable and works for any value an admin picks.
+                    <Badge
+                      variant="outline"
+                      className="gap-1.5"
+                      style={{ borderColor: post.categoryColor }}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className="inline-block h-2 w-2 rounded-full"
+                        style={{ backgroundColor: post.categoryColor }}
+                      />
                       {post.categoryName}
                     </Badge>
                   )}
@@ -316,7 +331,7 @@ export default function AnonymousDiscussionBoard() {
                       <span>Reply</span>
                     </Button>
                   </div>
-                  <Button variant="ghost" size="sm" className="text-gray-500">
+                  <Button variant="ghost" size="sm" className="text-gray-500" aria-label="Report this post">
                     <Flag className="h-4 w-4" />
                   </Button>
                 </div>
