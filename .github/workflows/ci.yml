@@ -2,32 +2,55 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
+
+# A second push to the same branch makes the first run's result irrelevant.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     strategy:
+      # Report every version's result rather than cancelling the rest on the
+      # first failure, which otherwise hides a version-specific break.
+      fail-fast: false
       matrix:
-        node-version: [18.x, 20.x]
+        # 20 is the oldest line still in maintenance; 18 went end of life in
+        # April 2025 and was still being tested here.
+        node-version: [20.x, 22.x]
 
     steps:
-    - uses: actions/checkout@v3
-    
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    
-    - name: Install dependencies
-      run: npm ci
-    
-    - name: Run linter
-      run: npm run lint
-    
-    - name: Build project
-      run: npm run build
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        # next build type checks too, but this fails in seconds rather than
+        # after a full build, and reports every error instead of the first.
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Security invariants
+        # The 70 checks in scripts/verify-security-invariants.ts: role
+        # escalation, ownership, URL handling, rate-limit configuration and
+        # the escalation endpoint's authentication. They need no database and
+        # no environment, which is what makes them runnable here — and until
+        # now they only ever ran on someone's laptop.
+        run: npm run verify:security
+
+      - name: Build
+        run: npm run build

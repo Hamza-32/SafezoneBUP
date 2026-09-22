@@ -104,7 +104,7 @@ You are tasked with creating comprehensive launch documentation for **SafezoneBU
 ## Installation & Setup
 
 ### Prerequisites
-- Node.js 18+ (currently using Node.js with npm/pnpm)
+- Node.js 20+ (npm)
 - MySQL/MariaDB server
 - Git for version control
 

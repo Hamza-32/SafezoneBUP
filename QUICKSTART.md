@@ -1,91 +1,90 @@
-# SafeZone - Quick Start Guide
+# SafezoneBUP — quick start
 
-## 🚀 Get Started in 5 Minutes
+Five minutes from a clone to a running app. [RUNNING.md](RUNNING.md) covers
+everything else: deployment, rate limiting, check-in escalation, database
+commands and the verification scripts.
 
-### Step 1: Prerequisites
-- Install Node.js 18+ from https://nodejs.org
-- Install MySQL 8+ from https://dev.mysql.com/downloads/
-- Ensure MySQL service is running
+## 1. Prerequisites
 
-### Step 2: Setup Database
-1. Create a MySQL database named `safezone_db`
-2. Note your MySQL username and password
+- Node.js 20 or newer
+- npm
+- A free [Supabase](https://supabase.com) project
 
-### Step 3: Run Setup Script
-**Windows:**
-```cmd
-setup.bat
+Nothing to install for the database. Supabase works for local development as
+well as production, so there is no local server to run.
+
+> **If you find older instructions mentioning MySQL**, `safezone_db`,
+> `mysql2` or a `backend/` folder, they predate the move to PostgreSQL and no
+> longer apply. This file used to be one of them.
+
+## 2. Install and configure
+
+```powershell
+npm install
+Copy-Item .env.example .env.local
 ```
 
-**Mac/Linux:**
-```bash
-chmod +x setup.sh
-./setup.sh
+Edit `.env.local` and set two values:
+
+| Variable       | Where it comes from                                           |
+| -------------- | ------------------------------------------------------------- |
+| `DATABASE_URL` | Supabase: Project Settings → Database → Connection string      |
+| `JWT_SECRET`   | Run `npm run gen:secret` and paste the output                  |
+
+Use the **connection pooler** string, not the direct connection — it is what
+lets many short-lived functions share a few real connections. URL-encode the
+password if it contains any of `@ : / ? # %`.
+
+Supabase's pooler presents a certificate Node does not trust by default, so
+download the CA from Project Settings → Database → SSL Configuration and
+point at it:
+
+```
+DB_SSL_CA_FILE=supabase-ca.crt
 ```
 
-### Step 4: Configure Database
-1. Edit `backend/.env` file
-2. Update these values:
-   ```env
-   DB_USER=your_mysql_username
-   DB_PASSWORD=your_mysql_password
-   ```
+## 3. Create the schema
 
-### Step 5: Start the Application
-```bash
+```powershell
+npm run db:init
+```
+
+This creates the tables and seeds sample data. It prints a generated
+administrator password **once** — save it before the terminal scrolls.
+
+## 4. Run it
+
+```powershell
 npm run dev
 ```
 
-Visit:
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:3001
+- App: http://localhost:3000
+- Health check: http://localhost:3000/api/health
 
-### Default Login Credentials
+The health check is the quickest way to confirm the database is reachable. It
+returns `"database": {"status": "connected"}` when everything is wired up.
 
-**Admin Account:**
-- Email: `admin@safezone.edu`
-- Password: `admin123`
+## 5. Confirm it works
 
-**Student Account:**
-- Email: `john.doe@student.edu`
-- Password: `student123`
+```powershell
+npm run verify:security
+```
 
-## 🎯 Key Features to Test
+70 checks covering role escalation, record ownership, URL handling and
+authentication. They need no database and take a couple of seconds.
 
-1. **Student Dashboard** - Login as student to view personal dashboard
-2. **Emergency Reporting** - Report emergencies with location tracking
-3. **Complaint System** - File complaints about campus issues
-4. **Admin Panel** - Login as admin to manage all reports and users
-5. **Anonymous Reporting** - Report incidents without logging in
+With the dev server running, `npm run verify:api` exercises the same paths
+against a real database and cleans up after itself.
 
-## 🛠️ Troubleshooting
+## Common problems
 
-**Database Connection Error:**
-- Verify MySQL is running
-- Check credentials in `backend/.env`
-- Ensure database `safezone_db` exists
+**`SELF_SIGNED_CERT_IN_CHAIN`** — `DB_SSL_CA_FILE` is not set, or points at a
+file that is not there. See step 2.
 
-**Port Already in Use:**
-- Change ports in `backend/.env` and `.env.local`
+**`password authentication failed`** — the password in `DATABASE_URL` needs
+URL-encoding, or you copied the template string with `[YOUR-PASSWORD]` still
+in it.
 
-**Build Errors:**
-- Delete `node_modules` and run `npm install` again
+**Port 3000 in use** — Next.js moves to 3001 and prints the address it chose.
 
-## 📱 Mobile Responsive
-The application is fully responsive and works on all devices.
-
-## 🔒 Security Features
-- JWT authentication
-- Password hashing
-- SQL injection protection
-- CORS configuration
-- Input validation
-
-## 📊 Database Overview
-- **Users:** Student and admin accounts
-- **Emergency Reports:** Critical incident tracking
-- **Complaints:** General issue management
-- **Notifications:** Real-time user alerts
-- **Audit Logs:** Complete activity tracking
-
-For detailed documentation, see `README.md`
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md) has more.

@@ -23,7 +23,7 @@ We welcome contributions to the SafezoneBUP project! This document provides guid
 # Install dependencies
 npm install
 # or
-pnpm install
+npm install
 
 # Set up environment variables
 cp .env.example .env.local

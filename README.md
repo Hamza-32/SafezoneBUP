@@ -26,7 +26,7 @@ A comprehensive campus safety platform built with Next.js, featuring user authen
 
 ## 📋 Prerequisites
 
-- Node.js 18+ and npm/pnpm
+- Node.js 20+ and npm
 - MySQL or MariaDB database
 - Git
 
@@ -42,7 +42,7 @@ cd SafezoneBUP
 ```bash
 npm install
 # or
-pnpm install
+npm install
 ```
 
 ### 3. Database Setup
@@ -120,9 +120,11 @@ SafezoneBUP/
 │   ├── api-middleware.ts    # API utilities and middleware
 │   ├── database.ts          # Database connection and utilities
 │   └── utils.ts             # General utilities
-├── scripts/                 # Database and utility scripts
-│   ├── setup-database.js    # Database initialization
-│   └── seed-database.js     # Sample data seeding
+├── scripts/                 # Verification and maintenance scripts
+│   ├── verify-security-invariants.ts  # 70 offline security checks
+│   ├── verify-api.ts                  # End-to-end checks
+│   ├── verify-rate-limit.ts           # Shared rate-limit store
+│   └── admin-password.ts              # Audit and rotate passwords
 └── public/                  # Static assets
 ```
 
