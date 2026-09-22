@@ -24,13 +24,22 @@
 
 ### 3. Database Connection Issues
 
-**Problem**: Backend cannot connect to MySQL database.
+**Problem**: The app cannot reach the database.
+
+There is no local database server: the app runs on Supabase over the network.
 
 **Solutions**:
-1. Ensure MySQL service is running
-2. Check database credentials in `backend/.env`
-3. Create the database: `CREATE DATABASE safezone_db;`
-4. Test connection: `mysql -u root -p safezone_db`
+1. Check `DATABASE_URL` in `.env.local`. It must be the **connection pooler**
+   string (`...pooler.supabase.com:6543`), not the direct connection.
+2. `SELF_SIGNED_CERT_IN_CHAIN` means `DB_SSL_CA_FILE` is unset or points at a
+   missing file. Download the CA from Project Settings, Database, SSL
+   Configuration.
+3. `password authentication failed` usually means the password needs
+   URL-encoding, or `[YOUR-PASSWORD]` was copied across from the template.
+4. A free Supabase project pauses after about a week idle. The first request
+   wakes it and is slow; the second confirms it.
+5. Test the whole path: `npm run dev`, then open
+   http://localhost:3000/api/health
 
 ### 4. Port Already in Use
 
@@ -63,7 +72,7 @@
 **Solutions**:
 1. Check if all backend dependencies are installed
 2. Verify `backend/.env` file exists with correct values
-3. Check MySQL connection settings
+3. Check `DATABASE_URL` and that the Supabase project is awake
 4. Look for syntax errors in backend files
 
 ### 7. Frontend Won't Load
@@ -92,7 +101,6 @@ npm install --legacy-peer-deps
 taskkill /im node.exe /f
 
 # Restart VS Code
-# Restart MySQL service
 # Run: npm run dev
 ```
 
@@ -110,11 +118,11 @@ npm update
 
 ## Environment Setup Checklist
 
-- [ ] Node.js 18+ installed
-- [ ] MySQL 8+ installed and running
-- [ ] Database `safezone_db` created
-- [ ] `backend/.env` configured with correct credentials
-- [ ] All dependencies installed: `npm install --legacy-peer-deps`
+- [ ] Node.js 20+ installed
+- [ ] A Supabase project created, and not paused
+- [ ] `.env.local` has `DATABASE_URL`, `DB_SSL_CA_FILE` and `JWT_SECRET`
+- [ ] Schema created: `npm run db:init`
+- [ ] All dependencies installed: `npm install`
 - [ ] TypeScript server restarted in VS Code
 - [ ] No port conflicts (3000, 3001)
 

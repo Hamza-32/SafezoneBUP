@@ -9,7 +9,7 @@ A comprehensive campus safety platform built with Next.js, featuring user authen
 - **Complaint System**: Structured complaint filing and tracking
 - **Role-based Dashboards**: Separate interfaces for students and administrators
 - **Profile Management**: User verification and profile updates
-- **Real-time Notifications**: Toast notifications for user feedback
+- **In-app Notifications**: Responders are notified of reports, SOS alerts and unconfirmed check-ins
 - **Responsive Design**: Mobile-friendly interface with modern UI components
 
 ## 🛠 Tech Stack
@@ -17,7 +17,7 @@ A comprehensive campus safety platform built with Next.js, featuring user authen
 - **Frontend**: Next.js 14, React, TypeScript
 - **Styling**: Tailwind CSS, shadcn/ui components
 - **Backend**: Next.js API Routes
-- **Database**: MySQL/MariaDB
+- **Database**: PostgreSQL (Supabase)
 - **Authentication**: JWT tokens
 - **Notifications**: Sonner toast library
 - **UI**: React 18, TypeScript, Tailwind CSS, Radix UI
@@ -27,7 +27,7 @@ A comprehensive campus safety platform built with Next.js, featuring user authen
 ## 📋 Prerequisites
 
 - Node.js 20+ and npm
-- MySQL or MariaDB database
+- A PostgreSQL database. A free Supabase project is the intended setup and needs nothing installed locally.
 - Git
 
 ## ⚙️ Installation & Setup
@@ -41,35 +41,39 @@ cd SafezoneBUP
 ### 2. Install Dependencies
 ```bash
 npm install
-# or
-npm install
 ```
 
 ### 3. Database Setup
 
-Create a MySQL/MariaDB database and update the environment variables:
+Create a free [Supabase](https://supabase.com) project, then:
 
 ```bash
-# Copy environment template
 cp .env.example .env.local
 ```
 
-Edit `.env.local` with your database credentials:
+Edit `.env.local`:
+
 ```env
-DB_HOST=localhost
-DB_USER=your_db_user
-DB_PASSWORD="your_db_password"
-DB_NAME=safezone_db
-JWT_SECRET=your-super-secret-jwt-key-here
-NEXT_PUBLIC_API_URL=
+# Project Settings -> Database -> Connection string. Use the POOLER string,
+# not the direct connection: it is what lets many short-lived serverless
+# functions share a small number of real connections.
+DATABASE_URL=postgresql://...@aws-0-<region>.pooler.supabase.com:6543/postgres
+
+# Supabase's pooler presents a certificate Node does not trust by default.
+# Download it from Project Settings -> Database -> SSL Configuration.
+DB_SSL_CA_FILE=supabase-ca.crt
+
+# Generate with: npm run gen:secret
+# A template placeholder is rejected outright, not merely warned about.
+JWT_SECRET=
 ```
 
-**Important**: Always quote your database password if it contains special characters.
+**Important**: URL-encode the database password if it contains any of `@ : / ? # %`.
 
 ### 4. Initialize Database
 ```bash
-# Create database tables and seed initial data
-npm run db:setup
+# Create the tables, run migrations and seed sample data
+npm run db:init
 ```
 
 ### 5. Start Development Server
@@ -178,7 +182,7 @@ The application uses the following main tables:
 
 1. **Environment Variables**: Always quote database passwords containing special characters
 2. **Security**: Change the JWT_SECRET in production
-3. **Database**: Ensure your MySQL/MariaDB server is running before starting the application
+3. **Database**: Supabase is hosted, so there is no local server to start. A paused free project wakes on the first request.
 4. **Ports**: The application will automatically find an available port if 3000 is in use
 
 ## 🐛 Troubleshooting
@@ -187,7 +191,7 @@ The application uses the following main tables:
 
 1. **Database Connection Errors**:
    - Verify database credentials in `.env.local`
-   - Ensure MySQL/MariaDB server is running
+   - Check `DATABASE_URL` points at the pooler and the project is not paused
    - Check if database exists and is accessible
 
 2. **Environment Variable Issues**:
@@ -233,7 +237,7 @@ The application includes:
 
 For production deployment:
 
-1. Set up a production MySQL database
+1. Set up a production PostgreSQL database (Supabase)
 2. Update environment variables for production
 3. Build the application: `npm run build`
 4. Start the production servers: `npm start`
@@ -246,7 +250,7 @@ For production deployment:
 ### Common Issues
 
 1. **Database Connection Error**
-   - Check MySQL is running
+   - Check the Supabase project is awake and `DATABASE_URL` is correct
    - Verify database credentials in `.env`
    - Ensure database exists
 

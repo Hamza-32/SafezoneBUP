@@ -85,7 +85,7 @@ export function Navbar({ user, onNavigate, onLogout }: NavbarProps) {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48">
                 <DropdownMenuItem onClick={() => onNavigate("complaint")}>
-                  Report Issue
+                  File Complaint
                 </DropdownMenuItem>
                 {safetyNavItems.map((item) => (
                   <DropdownMenuItem key={item.page} onClick={() => onNavigate(item.page)}>
@@ -220,7 +220,7 @@ export function Navbar({ user, onNavigate, onLogout }: NavbarProps) {
                   setMobileMenuOpen(false)
                 }}
               >
-                Report Issue
+                File Complaint
               </Button>
               {safetyNavItems.map((item) => (
                 <Button
