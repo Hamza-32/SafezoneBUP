@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MessageSquare, Plus, ThumbsUp, ThumbsDown, Flag, Eye, EyeOff, Clock } from 'lucide-react';
 import apiClient from '@/lib/api-client';
+import { toast } from 'sonner';
 
 interface DiscussionCategory {
   id: number;
@@ -38,6 +39,8 @@ export default function AnonymousDiscussionBoard() {
   const [posts, setPosts] = useState<DiscussionPost[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showNewPostDialog, setShowNewPostDialog] = useState(false);
   const [newPost, setNewPost] = useState({
     title: '',
@@ -64,38 +67,16 @@ export default function AnonymousDiscussionBoard() {
 
   const fetchPosts = async () => {
     try {
-      // In a real implementation, you'd have a posts endpoint
-      // For now, we'll simulate some posts
-      setPosts([
-        {
-          id: 1,
-          categoryId: 1,
-          title: "Struggling with exam anxiety",
-          content: "Does anyone have tips for managing severe anxiety during exams? I've been having panic attacks...",
-          isAnonymous: true,
-          status: 'approved',
-          upvotes: 12,
-          downvotes: 0,
-          createdAt: new Date().toISOString(),
-          categoryName: 'Mental Health Support',
-          categoryColor: '#10B981'
-        },
-        {
-          id: 2,
-          categoryId: 2,
-          title: "Study group safety concerns",
-          content: "Are there safe spaces on campus for late-night study groups? Some areas feel unsafe after dark.",
-          isAnonymous: true,
-          status: 'approved',
-          upvotes: 8,
-          downvotes: 1,
-          createdAt: new Date().toISOString(),
-          categoryName: 'Campus Safety',
-          categoryColor: '#F59E0B'
-        }
-      ]);
+      // This returned two invented posts — including a fabricated one about
+      // panic attacks — while apiClient.getDiscussionPosts sat unused and the
+      // endpoint behind it worked.
+      const result = await apiClient.getDiscussionPosts();
+      const data = (result as any).data ?? result;
+      setPosts(data?.posts ?? []);
+      setLoadError(null);
     } catch (error) {
       console.error('Error fetching posts:', error);
+      setLoadError('Could not load the discussion board. Try again shortly.');
     } finally {
       setLoading(false);
     }
@@ -103,28 +84,45 @@ export default function AnonymousDiscussionBoard() {
 
   const handleSubmitPost = async () => {
     if (!newPost.title || !newPost.content || !newPost.categoryId) {
-      alert('Please fill in all required fields');
+      toast.error('Please fill in all required fields');
       return;
     }
 
+    setSubmitting(true);
+
     try {
-      // In a real implementation, you'd submit to a posts endpoint
-      console.log('Submitting post:', newPost);
-      
-      // Reset form and close dialog
-      setNewPost({
-        title: '',
-        content: '',
-        categoryId: '',
-        isAnonymous: true
+      // This used to console.log the post and then tell the author it had
+      // been submitted for moderation. Every post was silently discarded —
+      // including, given what this board is for, ones written by someone in
+      // distress.
+      const result = await apiClient.createDiscussionPost({
+        title: newPost.title,
+        content: newPost.content,
+        categoryId: Number(newPost.categoryId),
+        isAnonymous: newPost.isAnonymous,
       });
+
+      const data = (result as any).data ?? result;
+
+      setNewPost({ title: '', content: '', categoryId: '', isAnonymous: true });
       setShowNewPostDialog(false);
-      
-      // Show success message
-      alert('Your post has been submitted for moderation and will appear once approved.');
-    } catch (error) {
+
+      toast.success(
+        data?.status === 'pending'
+          ? 'Submitted. It will appear once a moderator approves it.'
+          : 'Your post is live.'
+      );
+
+      await fetchPosts();
+    } catch (error: any) {
       console.error('Error submitting post:', error);
-      alert('Failed to submit post. Please try again.');
+      toast.error(
+        error?.status === 401
+          ? 'Sign in to post to the discussion board.'
+          : error?.message || 'Could not submit your post. It has not been saved.'
+      );
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -227,7 +225,7 @@ export default function AnonymousDiscussionBoard() {
                 <Button variant="outline" onClick={() => setShowNewPostDialog(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleSubmitPost}>
+                <Button onClick={handleSubmitPost} disabled={submitting}>
                   Submit for Review
                 </Button>
               </div>
@@ -260,12 +258,19 @@ export default function AnonymousDiscussionBoard() {
       </div>
 
       <div className="space-y-4">
-        {filteredPosts.length === 0 ? (
+        {loadError ? (
           <Card>
             <CardContent className="text-center py-8">
-              <MessageSquare className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <p className="text-gray-500">No posts found in this category.</p>
-              <p className="text-sm text-gray-400 mt-2">Be the first to start a discussion!</p>
+              <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-primary">{loadError}</p>
+            </CardContent>
+          </Card>
+        ) : filteredPosts.length === 0 ? (
+          <Card>
+            <CardContent className="text-center py-8">
+              <MessageSquare className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No posts found in this category.</p>
+              <p className="text-sm text-muted-foreground mt-2">Be the first to start a discussion.</p>
             </CardContent>
           </Card>
         ) : (

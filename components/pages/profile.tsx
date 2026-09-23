@@ -15,17 +15,28 @@ interface ProfileProps {
 
 export default function Profile({ userData, onNavigate, onUpdateProfile }: ProfileProps) {
   const [isEditing, setIsEditing] = useState(false)
+  // These are the four columns PUT /api/auth/profile accepts. The form used
+  // to send name/email/phone/department/personalNumber/address, which shares
+  // not one field with the schema, so Zod stripped the whole body and every
+  // save returned 400 "No fields to update". department and address were
+  // never storable at all — the users table has no such columns.
   const [formData, setFormData] = useState({
-    name: userData.name || "",
-    email: userData.email || "",
-    phone: userData.phone || "",
-    department: userData.department || "",
-    personalNumber: userData.personalNumber || "",
-    address: userData.address || "",
+    firstName: userData.firstName || "",
+    lastName: userData.lastName || "",
+    phoneNumber: userData.phoneNumber || "",
+    studentId: userData.studentId || "",
   })
 
   const handleSave = () => {
-    onUpdateProfile(formData)
+    // Send only what changed, so a blank optional field is left alone rather
+    // than overwriting a stored value with an empty string.
+    const changed: Record<string, string> = {}
+    if (formData.firstName.trim()) changed.firstName = formData.firstName.trim()
+    if (formData.lastName.trim()) changed.lastName = formData.lastName.trim()
+    if (formData.phoneNumber.trim()) changed.phoneNumber = formData.phoneNumber.trim()
+    if (formData.studentId.trim()) changed.studentId = formData.studentId.trim()
+
+    onUpdateProfile(changed)
     setIsEditing(false)
   }
 
@@ -107,36 +118,46 @@ export default function Profile({ userData, onNavigate, onUpdateProfile }: Profi
           <CardContent className="space-y-4">
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
+                <Label htmlFor="firstName">First Name</Label>
                 {isEditing ? (
                   <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    id="firstName"
+                    value={formData.firstName}
+                    onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                   />
                 ) : (
                   <div className="flex items-center gap-2 p-2 border rounded-md bg-muted/20">
                     <User className="size-4 text-muted-foreground" />
-                    <span>{userData.name}</span>
+                    <span>{userData.firstName || "Not provided"}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                {isEditing ? (
+                  <Input
+                    id="lastName"
+                    value={formData.lastName}
+                    onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                  />
+                ) : (
+                  <div className="flex items-center gap-2 p-2 border rounded-md bg-muted/20">
+                    <User className="size-4 text-muted-foreground" />
+                    <span>{userData.lastName || "Not provided"}</span>
                   </div>
                 )}
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="email">Email Address</Label>
-                {isEditing ? (
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  />
-                ) : (
-                  <div className="flex items-center gap-2 p-2 border rounded-md bg-muted/20">
-                    <Mail className="size-4 text-muted-foreground" />
-                    <span>{userData.email}</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-2 p-2 border rounded-md bg-muted/20">
+                  <Mail className="size-4 text-muted-foreground" />
+                  <span>{userData.email}</span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Your address identifies your account and cannot be changed here.
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -145,13 +166,13 @@ export default function Profile({ userData, onNavigate, onUpdateProfile }: Profi
                   <Input
                     id="phone"
                     type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    value={formData.phoneNumber}
+                    onChange={(e) => setFormData({ ...formData, phoneNumber: e.target.value })}
                   />
                 ) : (
                   <div className="flex items-center gap-2 p-2 border rounded-md bg-muted/20">
                     <Phone className="size-4 text-muted-foreground" />
-                    <span>{userData.phone || "Not provided"}</span>
+                    <span>{userData.phoneNumber || "Not provided"}</span>
                   </div>
                 )}
               </div>

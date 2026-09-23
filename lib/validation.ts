@@ -130,8 +130,24 @@ export const updateProfileSchema = z.object({
 export const CHECKIN_STATUSES = ['pending', 'arrived', 'missed', 'alerted'] as const;
 
 /** `userId` is absent by design: the handler takes it from the session. */
+/**
+ * An instant, not a wall-clock reading.
+ *
+ * A bare "2026-09-23T21:30" is resolved by the runtime's own timezone, so the
+ * same submission meant different instants on a developer's laptop and on
+ * Vercel. Requiring an explicit offset makes the ambiguity impossible rather
+ * than merely discouraged, and the client sends toISOString().
+ */
+const absoluteDateTime = z
+  .string()
+  .refine((value) => /(?:Z|[+-]\d{2}:?\d{2})$/.test(value.trim()), {
+    message:
+      'Timestamp must carry a UTC offset, for example 2026-09-23T15:30:00.000Z',
+  })
+  .pipe(z.coerce.date());
+
 export const createCheckinSchema = z.object({
-  expectedArrivalTime: z.coerce.date(),
+  expectedArrivalTime: absoluteDateTime,
   location: trimmedString(1, 255),
   emergencyContactId: idSchema.optional().nullable(),
   notes: z.string().trim().max(2000).optional(),

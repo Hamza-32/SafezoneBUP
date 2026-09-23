@@ -154,6 +154,9 @@ async function cleanup(): Promise<void> {
   await Database.query('DELETE FROM complaints WHERE title LIKE ?', [runTag]).catch(
     () => undefined
   );
+  await Database.query('DELETE FROM discussion_posts WHERE title LIKE ?', [runTag]).catch(
+    () => undefined
+  );
 
   await Database.query(`DELETE FROM safety_checkins WHERE userId IN (${idPlaceholders})`, ids);
   await Database.query(`DELETE FROM lost_and_found WHERE userId IN (${idPlaceholders})`, ids).catch(
@@ -500,6 +503,38 @@ async function main(): Promise<void> {
     staffReports.status === 403,
     `status ${staffReports.status}`
   );
+
+  // -------------------------------------------------------------------------
+  // The discussion board.
+  //
+  // Its submit handler used to console.log the post and then tell the author
+  // "submitted for moderation". Nothing was stored. The board is for peer
+  // support, so the posts being silently dropped were the ones written by
+  // someone who needed an answer.
+  section('Discussion posts are stored');
+
+  const categories = await call('GET', '/api/discussion/categories', { session: aliceSession });
+  const categoryList = categories.body?.data ?? categories.body?.data?.categories ?? [];
+  const firstCategory = Array.isArray(categoryList) ? categoryList[0] : null;
+
+  if (!firstCategory) {
+    check('a discussion category exists to post into', false, 'no categories returned');
+  } else {
+    const created = await call('POST', '/api/discussion/posts', {
+      session: aliceSession,
+      body: {
+        title: `verify-${runId} discussion post`,
+        content: 'Written by verify:api and removed when the run finishes.',
+        categoryId: firstCategory.id,
+        isAnonymous: true,
+      },
+    });
+
+    check('a discussion post is accepted', created.status === 201 || created.status === 200,
+      `status ${created.status}`);
+    check('the stored post is given an id', Boolean(created.body?.data?.id),
+      JSON.stringify(created.body?.data ?? {}).slice(0, 80));
+  }
 
   // -------------------------------------------------------------------------
   section('Removed endpoints are gone');

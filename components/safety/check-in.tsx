@@ -99,8 +99,16 @@ export default function SafetyCheckin() {
     }
 
     try {
+      // <input type="datetime-local"> yields a wall-clock string with no
+      // offset, e.g. "2026-09-23T21:30". Sent as-is, the server resolves it
+      // in ITS timezone, which is UTC on Vercel — so a Dhaka student asking
+      // to be checked on at 21:30 was recorded as 21:30 UTC, i.e. 03:30 the
+      // next morning, and escalation ran six hours late.
+      //
+      // Converting here is the fix, because the browser's local timezone is
+      // the user's. toISOString() then carries an explicit Z.
       await apiClient.createCheckin({
-        expectedArrivalTime: newCheckin.expectedArrivalTime,
+        expectedArrivalTime: new Date(newCheckin.expectedArrivalTime).toISOString(),
         location: newCheckin.location,
         emergencyContactId: newCheckin.emergencyContactId
           ? Number(newCheckin.emergencyContactId)
