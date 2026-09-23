@@ -27,11 +27,31 @@ export async function POST(request: NextRequest) {
   const originError = assertSameOrigin(request);
   if (originError) return originError;
 
-  const limited = await enforceRateLimit(request, 'emergency-report', 10, 10 * 60);
+  const user = await optionalUser(request);
+
+  // Ten per ten minutes keyed on the client address was the wrong shape for
+  // this endpoint specifically. A campus shares egress addresses, so the
+  // limit pooled every student behind one counter — and the moment it would
+  // bind is a fire or an evacuation, when many people report the same thing
+  // at once. The eleventh person to report a real emergency was told to slow
+  // down.
+  //
+  // The costs are not symmetric. A handful of spam reports wastes a
+  // responder's minute; one refused genuine report can cost far more. So the
+  // limit is kept, because an open endpoint would be abused, but shaped so
+  // it binds on an individual rather than on a building:
+  //
+  //   signed in  -> per account, since one person does not need more
+  //   anonymous  -> per address, with a ceiling high enough for a whole
+  //                 building to report at once and low enough to stop a
+  //                 script
+  const limited = user
+    ? await enforceRateLimit(request, 'emergency-report-user', 10, 10 * 60, String(user.id))
+    : await enforceRateLimit(request, 'emergency-report-ip', 100, 10 * 60);
+
   if (limited) return limited;
 
   try {
-    const user = await optionalUser(request);
 
     const parsed = await parseBody(request, createEmergencyReportSchema);
     if (!parsed.ok) return parsed.response;

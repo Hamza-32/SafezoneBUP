@@ -29,11 +29,19 @@ export async function POST(request: NextRequest) {
   const originError = assertSameOrigin(request);
   if (originError) return originError;
 
-  const limited = await enforceRateLimit(request, 'complaint-report', 10, 10 * 60);
+  const user = await optionalUser(request);
+
+  // Same reshaping as the emergency endpoint, for the same reason: a campus
+  // shares egress addresses, so an address-keyed limit pools unrelated
+  // people. A complaint is not time-critical the way an emergency is, so the
+  // anonymous ceiling is lower.
+  const limited = user
+    ? await enforceRateLimit(request, 'complaint-report-user', 10, 10 * 60, String(user.id))
+    : await enforceRateLimit(request, 'complaint-report-ip', 40, 10 * 60);
+
   if (limited) return limited;
 
   try {
-    const user = await optionalUser(request);
 
     const parsed = await parseBody(request, createComplaintSchema);
     if (!parsed.ok) return parsed.response;

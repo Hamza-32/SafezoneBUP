@@ -184,6 +184,25 @@ the fallback warning repeats every five minutes for as long as it applies.
 Both exist because the previous behaviour was a single log line at boot,
 which is indistinguishable from a healthy deployment once it scrolls away.
 
+### How the limits are keyed
+
+A campus shares egress addresses, so an address-keyed limit pools unrelated
+people behind one counter. That is the wrong shape for reporting: the moment
+it binds is a fire or an evacuation, when many people report the same thing
+from the same network within a minute or two.
+
+Reporting endpoints therefore key on the account when there is one, and fall
+back to the address only for anonymous callers, with a ceiling high enough
+for a whole building:
+
+| Endpoint | Signed in | Anonymous |
+| -------- | --------- | --------- |
+| Emergency report | 10 / 10 min per account | 100 / 10 min per address |
+| Complaint | 10 / 10 min per account | 40 / 10 min per address |
+
+Login and password endpoints stay address-keyed and tight, because there the
+address is the thing being defended against.
+
 ### When the store is down
 
 The limiter falls back to per-process counters rather than rejecting the
