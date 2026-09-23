@@ -56,9 +56,13 @@ export async function POST(request: NextRequest) {
       return errorResponse('Invalid credentials', 401);
     }
 
-    delete user.password;
-
     const token = generateToken(user.id, user.tokenVersion ?? 0);
+
+    // Neither belongs in the response body. tokenVersion is internal
+    // bookkeeping, and echoing it tells a caller how many times the password
+    // has been rotated.
+    delete user.password;
+    delete user.tokenVersion;
 
     await logAction(user.id, 'LOGIN', 'users', user.id, { role: user.role }, request);
 
