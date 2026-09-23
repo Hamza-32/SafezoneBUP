@@ -64,22 +64,40 @@ export default function EmergencyRequest({ onNavigate }: EmergencyRequestProps) 
    * Never blocks the report: if the browser denies permission or takes too
    * long, the report still goes out with the typed location only.
    */
+  /** Longest the report will wait on the browser for a position. */
+  const LOCATION_DEADLINE_MS = 6000
+
   const captureCoordinates = (): Promise<{ latitude: number; longitude: number } | null> => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       return Promise.resolve(null)
     }
 
-    return new Promise((resolve) => {
+    const position = new Promise<{ latitude: number; longitude: number } | null>((resolve) => {
       navigator.geolocation.getCurrentPosition(
-        (position) =>
+        (result) =>
           resolve({
-            latitude: position.coords.latitude,
-            longitude: position.coords.longitude,
+            latitude: result.coords.latitude,
+            longitude: result.coords.longitude,
           }),
         () => resolve(null),
         { timeout: 5000, maximumAge: 60000 }
       )
     })
+
+    // getCurrentPosition's own timeout only starts once permission has been
+    // decided: in Chrome, a prompt the person never answers does not count
+    // against it, and the promise never settles. On this form that means the
+    // submit button spins forever while someone is trying to report an
+    // emergency, which is the worst place in the application to hang.
+    //
+    // A wall-clock deadline that does not depend on the geolocation API
+    // settling bounds it. Losing coordinates is a small cost; losing the
+    // report is not.
+    const deadline = new Promise<null>((resolve) => {
+      setTimeout(() => resolve(null), LOCATION_DEADLINE_MS)
+    })
+
+    return Promise.race([position, deadline])
   }
 
   const handleSubmit = async (e: React.FormEvent) => {

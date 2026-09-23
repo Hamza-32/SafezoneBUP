@@ -111,12 +111,31 @@ function buildPool(): Pool {
     process.env.DB_CONNECTION_LIMIT || String(DEFAULT_CONNECTION_LIMIT)
   );
 
+  // A query that never returns holds one of very few connections. On Vercel
+  // the pool is capped at 2, so two stuck queries take the whole instance
+  // down and every request after them waits for a connection that is not
+  // coming back. Before this there was no bound at all.
+  //
+  // query_timeout is the one that works here. It is enforced by node-pg in
+  // this process, so it holds regardless of what sits between us and
+  // PostgreSQL.
+  //
+  // statement_timeout is set too, but do not rely on it: Supabase's
+  // transaction pooler does not pass connection parameters through, and the
+  // server still reports 2min with this set to 10s — measured, not assumed.
+  // It is kept because it does take effect on a direct connection, which is
+  // what a local PostgreSQL or the session pooler gives you, and there it
+  // cancels the query server-side rather than just abandoning it.
+  const QUERY_TIMEOUT_MS = 10_000;
+
   const shared = {
     max: connectionLimit,
     ssl: resolveSsl(),
     // Supabase's pooler closes idle connections; do not hold them long.
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
+    statement_timeout: QUERY_TIMEOUT_MS,
+    query_timeout: QUERY_TIMEOUT_MS,
   };
 
   // A single connection string is what Supabase hands out, so prefer it.
