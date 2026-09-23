@@ -4,17 +4,38 @@ export const dynamic = 'force-dynamic';
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';
 import { enforceRateLimit } from '@/lib/rate-limit';
+import { optionalUser } from '@/lib/api-middleware';
 import { 
   successResponse,
   errorResponse,
   withAuth
 } from '@/lib/api-middleware';
 
+/** Statuses a moderator may ask for. Anyone else gets approved posts only. */
+const MODERATOR_STATUSES = new Set(['pending', 'rejected', 'flagged', 'approved']);
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const categoryId = searchParams.get('categoryId');
-    const status = searchParams.get('status') || 'approved';
+
+    // status came straight from the query string, so
+    // ?status=pending returned posts held for moderation to any
+    // unauthenticated caller, and ?status=rejected returned ones a moderator
+    // had already refused. On an anonymous board for mental health and
+    // campus safety, unreviewed content is the most sensitive content there
+    // is, and withholding it is the entire point of moderating.
+    //
+    // Anything other than 'approved' now requires staff. A student asking
+    // for pending posts silently gets approved ones rather than an error,
+    // because the existence of a moderation queue is not itself a secret and
+    // a 403 here would only invite probing.
+    const requestedStatus = searchParams.get('status') || 'approved';
+    const viewer = await optionalUser(request);
+    const isModerator = viewer?.role === 'admin' || viewer?.role === 'security';
+
+    const status =
+      isModerator && MODERATOR_STATUSES.has(requestedStatus) ? requestedStatus : 'approved';
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '10');
     const offset = (page - 1) * limit;

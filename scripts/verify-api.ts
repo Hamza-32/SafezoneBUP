@@ -537,6 +537,46 @@ async function main(): Promise<void> {
   }
 
   // -------------------------------------------------------------------------
+  // Moderation is not bypassable from the query string.
+  //
+  // GET /api/discussion/posts took its status straight from the caller, so
+  // ?status=pending returned posts held for moderation to anyone at all, and
+  // ?status=rejected returned ones a moderator had refused. Withholding
+  // unreviewed content is the entire point of moderating an anonymous board.
+  section('Unmoderated posts stay private');
+
+  const pendingAnon = await fetch(`${baseUrl}/api/discussion/posts?status=pending`);
+  const pendingBody = await pendingAnon.json().catch(() => ({}));
+  const anonPosts = pendingBody?.data?.posts ?? [];
+
+  check(
+    'an anonymous caller asking for pending posts receives none',
+    Array.isArray(anonPosts) && anonPosts.every((post: any) => post.status === 'approved'),
+    `${anonPosts.length} post(s), statuses ${[...new Set(anonPosts.map((p: any) => p.status))].join(',')}`
+  );
+
+  const rejectedAnon = await fetch(`${baseUrl}/api/discussion/posts?status=rejected`);
+  const rejectedBody = await rejectedAnon.json().catch(() => ({}));
+  const rejectedPosts = rejectedBody?.data?.posts ?? [];
+
+  check(
+    'an anonymous caller asking for rejected posts receives none',
+    Array.isArray(rejectedPosts) && rejectedPosts.every((post: any) => post.status === 'approved'),
+    `${rejectedPosts.length} post(s)`
+  );
+
+  const studentPending = await call('GET', '/api/discussion/posts?status=pending', {
+    session: aliceSession,
+  });
+  const studentPosts = studentPending.body?.data?.posts ?? [];
+
+  check(
+    'a signed-in student cannot read the moderation queue either',
+    Array.isArray(studentPosts) && studentPosts.every((post: any) => post.status === 'approved'),
+    `${studentPosts.length} post(s)`
+  );
+
+  // -------------------------------------------------------------------------
   section('Removed endpoints are gone');
 
   for (const path of ['/api/debug-env', '/api/resources', '/api/discussions']) {
