@@ -29,6 +29,7 @@ export const CAMEL_CASE_COLUMNS = [
   'studentId',
   'phoneNumber',
   'tokenVersion',
+  'assignedTo',
   'isVerified',
   'profileImage',
   'createdAt',

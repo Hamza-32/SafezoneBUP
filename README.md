@@ -28,9 +28,8 @@ notified immediately, by email as well as in the app.
 | **Safety resources** | Verified emergency numbers and campus guidance. |
 
 Two dashboards sit behind it: students see their own reports, staff see
-every report with its status. Acting on a report from the dashboard —
-assigning it, resolving it, adding a note — is not wired up yet; the
-controls are present but inert.
+every report with its status, can take ownership of one and move it through
+investigating and resolved.
 
 <details>
 <summary>More screenshots</summary>
@@ -112,7 +111,7 @@ Deployed on Vercel. Every third-party service is on a free tier.
 | --- | --- |
 | **61** unit tests | Vitest. No database, no network. |
 | **70** security invariants | Role escalation, record ownership, URL handling, rate-limit configuration, endpoint authentication. |
-| **64** end-to-end checks | Against a real database. Creates throwaway accounts and removes them. |
+| **72** end-to-end checks | Against a real database. Creates throwaway accounts and removes them. |
 | **0** accessibility violations | axe-core, WCAG 2.1 A and AA, across all ten pages. |
 
 ```bash

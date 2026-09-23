@@ -36,6 +36,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Progress } from "@/components/ui/progress"
 import apiClient from "@/lib/api-client"
+import { toast } from "sonner"
 
 // Rows come from /api/admin/dashboard. This component previously rendered a
 // hardcoded `reportsData` array and never called an API at all, so a real
@@ -51,6 +52,9 @@ interface DashboardReport {
   createdAt: string
   reporterName: string
   studentId: string | null
+  assignedTo: number | null
+  assignedAdminName: string | null
+  adminNotes: string | null
 }
 
 interface DashboardStats {
@@ -131,6 +135,49 @@ export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
   const [reports, setReports] = useState<DashboardReport[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+
+  const [busyId, setBusyId] = useState<number | null>(null)
+
+  // Ownership is taken by the person clicking, so the action needs their id.
+  const currentUserId: number | null = user?.id ?? null
+
+  /**
+   * Apply a triage change and reflect it in the table.
+   *
+   * Every one of these controls was inert: there was no endpoint behind them
+   * until PATCH /api/emergency/reports/[id] existed. The row is updated from
+   * the server's response rather than optimistically, so what is on screen is
+   * what was actually stored.
+   */
+  const triage = async (
+    reportId: number,
+    changes: { status?: string; assignedTo?: number | null },
+    describe: string
+  ) => {
+    setBusyId(reportId)
+
+    try {
+      const result = await apiClient.updateEmergencyReport(reportId, changes)
+      const updated = (result as any).data ?? result
+
+      setReports((current) =>
+        current.map((report) =>
+          report.id === reportId ? { ...report, ...updated } : report
+        )
+      )
+
+      toast.success(describe)
+    } catch (error: any) {
+      console.error("Triage failed:", error)
+      toast.error(
+        error?.status === 403
+          ? "Your account cannot change reports."
+          : error?.message || "Could not save that. The report is unchanged."
+      )
+    } finally {
+      setBusyId(null)
+    }
+  }
 
   const criticalCount = stats?.reports.emergencies.critical ?? 0
   const pendingEmergencies = stats?.reports.emergencies.pending ?? 0
@@ -584,27 +631,65 @@ export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
                         </td>
                         <td className="py-4 px-4">
                           <StatusBadge status={report.status} />
+                          {report.assignedAdminName && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              {report.assignedTo === currentUserId
+                                ? 'Yours'
+                                : report.assignedAdminName}
+                            </p>
+                          )}
                         </td>
                         <td className="py-4 px-4 text-right">
                           <div className="flex items-center justify-end gap-1">
                             <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="View details">
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Edit">
-                              <Edit className="h-4 w-4" />
-                            </Button>
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="More actions">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  disabled={busyId === report.id}
+                                  aria-label={`Actions for report ${report.id}`}
+                                >
                                   <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                               </DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
-                                <DropdownMenuItem>Mark as Resolved</DropdownMenuItem>
-                                <DropdownMenuItem>Assign Staff</DropdownMenuItem>
-                                <DropdownMenuItem>Add Note</DropdownMenuItem>
+                                <DropdownMenuItem
+                                  disabled={report.status === 'investigating'}
+                                  onClick={() =>
+                                    triage(report.id, { status: 'investigating' }, 'Marked as investigating')
+                                  }
+                                >
+                                  Mark as investigating
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  disabled={report.status === 'resolved'}
+                                  onClick={() =>
+                                    triage(report.id, { status: 'resolved' }, 'Marked as resolved')
+                                  }
+                                >
+                                  Mark as resolved
+                                </DropdownMenuItem>
                                 <DropdownMenuSeparator />
-                                <DropdownMenuItem className="text-red-600">Archive</DropdownMenuItem>
+                                {report.assignedTo === currentUserId ? (
+                                  <DropdownMenuItem
+                                    onClick={() => triage(report.id, { assignedTo: null }, 'Released')}
+                                  >
+                                    Release ownership
+                                  </DropdownMenuItem>
+                                ) : (
+                                  <DropdownMenuItem
+                                    disabled={!currentUserId}
+                                    onClick={() =>
+                                      triage(report.id, { assignedTo: currentUserId }, 'Assigned to you')
+                                    }
+                                  >
+                                    Take ownership
+                                  </DropdownMenuItem>
+                                )}
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </div>

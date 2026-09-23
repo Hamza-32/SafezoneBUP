@@ -36,20 +36,24 @@ export async function GET(request: NextRequest) {
 
       // Get recent reports for quick access
       const latestEmergencies = await Database.query(
-        `SELECT 
-          er.id, er.title, er.category, er.location, 
-          er.status, er.priority, er.createdAt,
-          u.firstName, u.lastName, u.studentId
+        `SELECT
+          er.id, er.title, er.category, er.location,
+          er.status, er.priority, er.createdAt, er.isAnonymous,
+          er.assignedTo, er.adminNotes,
+          u.firstName, u.lastName, u.studentId,
+          assigned_admin.firstName AS assignedAdminFirstName,
+          assigned_admin.lastName  AS assignedAdminLastName
          FROM emergency_reports er
          LEFT JOIN users u ON er.userId = u.id
+         LEFT JOIN users assigned_admin ON er.assignedTo = assigned_admin.id
          ORDER BY er.createdAt DESC
          LIMIT 5`
       );
 
       const latestComplaints = await Database.query(
-        `SELECT 
-          c.id, c.title, c.category, 
-          c.status, c.priority, c.createdAt,
+        `SELECT
+          c.id, c.title, c.category,
+          c.status, c.priority, c.createdAt, c.isAnonymous,
           u.firstName, u.lastName, u.studentId
          FROM complaints c
          LEFT JOIN users u ON c.userId = u.id
@@ -85,19 +89,36 @@ export async function GET(request: NextRequest) {
       );
 
       // Process latest reports
-      const processedEmergencies = latestEmergencies.map(report => ({
-        ...report,
-        reporterName: report.firstName && report.lastName 
-          ? `${report.firstName} ${report.lastName}` 
-          : 'Anonymous'
-      }));
+      // Identity is withheld for a report submitted anonymously, matching the
+      // listing endpoints. This surface was missed when those were fixed, and
+      // it is the one a responder actually looks at.
+      const present = (row: any) => {
+        const anonymous = Boolean(row.isAnonymous);
+        const {
+          firstName,
+          lastName,
+          studentId,
+          assignedAdminFirstName,
+          assignedAdminLastName,
+          ...rest
+        } = row;
 
-      const processedComplaints = latestComplaints.map(complaint => ({
-        ...complaint,
-        reporterName: complaint.firstName && complaint.lastName 
-          ? `${complaint.firstName} ${complaint.lastName}` 
-          : 'Anonymous'
-      }));
+        return {
+          ...rest,
+          firstName: anonymous ? undefined : firstName,
+          lastName: anonymous ? undefined : lastName,
+          studentId: anonymous ? undefined : studentId,
+          reporterName:
+            anonymous || !(firstName && lastName) ? 'Anonymous' : `${firstName} ${lastName}`,
+          assignedAdminName:
+            assignedAdminFirstName && assignedAdminLastName
+              ? `${assignedAdminFirstName} ${assignedAdminLastName}`
+              : null,
+        };
+      };
+
+      const processedEmergencies = latestEmergencies.map(present);
+      const processedComplaints = latestComplaints.map(present);
 
       return successResponse({
         statistics: {

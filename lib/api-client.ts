@@ -90,6 +90,10 @@ class ApiClient {
     return this.request<T>(endpoint, { method: 'PUT', body: JSON.stringify(data) });
   }
 
+  async patch<T = any>(endpoint: string, data: any = {}): Promise<T> {
+    return this.request<T>(endpoint, { method: 'PATCH', body: JSON.stringify(data) });
+  }
+
   async delete<T = any>(endpoint: string, data: any = {}): Promise<T> {
     return this.request<T>(endpoint, { method: 'DELETE', body: JSON.stringify(data) });
   }
@@ -203,6 +207,18 @@ class ApiClient {
   // -------------------------------------------------------------------------
   // Admin
   // -------------------------------------------------------------------------
+
+  /**
+   * Triage a report. Staff only.
+   * Pass only what is changing: status, assignedTo (a staff id, or null to
+   * unassign) and adminNotes are each optional.
+   */
+  async updateEmergencyReport(
+    id: number,
+    changes: { status?: string; assignedTo?: number | null; adminNotes?: string }
+  ): Promise<ApiResponse> {
+    return this.patch(`/api/emergency/reports/${id}`, changes);
+  }
 
   async getAdminDashboard(): Promise<ApiResponse> {
     return this.get('/api/admin/dashboard');

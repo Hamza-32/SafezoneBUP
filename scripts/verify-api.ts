@@ -738,6 +738,70 @@ async function main(): Promise<void> {
   }
 
   // -------------------------------------------------------------------------
+  // Triage. The dashboard had View, Edit, Assign Staff, Mark as Resolved and
+  // Add Note controls with no endpoint behind any of them.
+  section('Staff can triage a report');
+
+  const triageTarget = await call('POST', '/api/emergency/report', {
+    session: aliceSession,
+    body: {
+      title: `verify-${runId} triage target`,
+      description: 'Created so triage can be exercised against it.',
+      category: 'other',
+      location: 'Test location',
+    },
+  });
+
+  const triageId = triageTarget.body?.data?.id ?? triageTarget.body?.data?.reportId;
+
+  if (!triageId) {
+    check('a report exists to triage', false, JSON.stringify(triageTarget.body ?? {}).slice(0, 90));
+  } else {
+    const studentAttempt = await call('PATCH', `/api/emergency/reports/${triageId}`, {
+      session: aliceSession,
+      body: { status: 'resolved' },
+    });
+    check('a student cannot triage a report', studentAttempt.status === 403,
+      `status ${studentAttempt.status}`);
+
+    const resolved = await call('PATCH', `/api/emergency/reports/${triageId}`, {
+      session: staffSession,
+      body: { status: 'resolved' },
+    });
+    check('staff can change the status', resolved.status === 200, `status ${resolved.status}`);
+    check('the new status comes back', resolved.body?.data?.status === 'resolved',
+      String(resolved.body?.data?.status));
+
+    const staffId = staffLogin.body?.data?.user?.id;
+    const assigned = await call('PATCH', `/api/emergency/reports/${triageId}`, {
+      session: staffSession,
+      body: { assignedTo: staffId },
+    });
+    check('staff can take ownership', assigned.body?.data?.assignedTo === staffId,
+      String(assigned.body?.data?.assignedTo));
+    check('the assignee name comes back', Boolean(assigned.body?.data?.assignedAdminName));
+
+    const toStudent = await call('PATCH', `/api/emergency/reports/${triageId}`, {
+      session: staffSession,
+      body: { assignedTo: login.body?.data?.user?.id },
+    });
+    check('a report cannot be assigned to a student', toStudent.status === 400,
+      `status ${toStudent.status}`);
+
+    const badStatus = await call('PATCH', `/api/emergency/reports/${triageId}`, {
+      session: staffSession,
+      body: { status: 'banana' },
+    });
+    check('an unknown status is rejected', badStatus.status === 400, `status ${badStatus.status}`);
+
+    const missing = await call('PATCH', '/api/emergency/reports/99999999', {
+      session: staffSession,
+      body: { status: 'resolved' },
+    });
+    check('triaging a missing report is a 404', missing.status === 404, `status ${missing.status}`);
+  }
+
+  // -------------------------------------------------------------------------
   section('Removed endpoints are gone');
 
   for (const path of ['/api/debug-env', '/api/resources', '/api/discussions']) {

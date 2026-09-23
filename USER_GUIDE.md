@@ -121,10 +121,13 @@ Verified reporters carry more weight with responders.
 Staff accounts see the admin dashboard: every emergency report and complaint,
 with its category, location, reporter and status, newest first.
 
-Acting on a report from that screen is **not yet implemented**. The View,
-Edit, Assign Staff, Mark as Resolved and Add Note controls are present but do
-nothing when clicked. Until they are wired up, coordinate outside the
-platform and treat the dashboard as a read-only view of what has come in.
+From the actions menu on a row you can take ownership of a report, release
+it again, and move it between investigating and resolved. Taking ownership is
+how other responders know it is being handled — the row shows who holds it.
+
+Only the triage state is editable. A report's title, description, location
+and category are the reporter's account of what happened and cannot be
+changed from here.
 
 Notifications appear in the dashboard, and are emailed if the deployment has
 alert delivery configured. Check with whoever administers the deployment

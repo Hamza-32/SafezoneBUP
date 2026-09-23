@@ -246,6 +246,18 @@ async function checkColumnCaseMap(): Promise<void> {
       if (COLUMN_CASE_MAP[match[1].toLowerCase()] === undefined) missing.add(match[1]);
     }
 
+    // Columns added by a migration. The pattern above anchors to the start of
+    // a line, which matches a CREATE TABLE body but not
+    // `ALTER TABLE ... ADD COLUMN assignedTo INTEGER`. assignedTo reached
+    // production through that gap: the column existed, the casing map did not
+    // know about it, every read of it came back undefined, and this check
+    // reported all clear.
+    for (const match of text.matchAll(
+      /ADD\s+COLUMN\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z]+[A-Z]\w*)/gi
+    )) {
+      if (COLUMN_CASE_MAP[match[1].toLowerCase()] === undefined) missing.add(match[1]);
+    }
+
     // Aliases introduced by a SELECT, which come back lower-cased too.
     for (const match of text.matchAll(/\bas\s+([a-z]+[A-Z]\w*)\b/g)) {
       if (COLUMN_CASE_MAP[match[1].toLowerCase()] === undefined) missing.add(match[1]);

@@ -127,6 +127,35 @@ export const updateProfileSchema = z.object({
 // Safety check-in
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Triage: what staff may change about a report
+// ---------------------------------------------------------------------------
+
+/** Matches the CHECK constraint on emergency_reports and complaints. */
+export const REPORT_STATUSES = ['pending', 'investigating', 'resolved', 'closed'] as const;
+
+/**
+ * What a responder may change from the dashboard.
+ *
+ * Deliberately narrow. Nothing here can alter what the reporter wrote — the
+ * title, description, location and category are their account of what
+ * happened and are not staff's to edit. Only the triage state is.
+ *
+ * assignedTo is a user id or null to unassign; the handler checks the target
+ * is actually staff, so a report cannot be parked on a student.
+ */
+export const updateReportSchema = z
+  .object({
+    status: z.enum(REPORT_STATUSES).optional(),
+    assignedTo: idSchema.nullable().optional(),
+    adminNotes: z.string().trim().max(5000).optional(),
+  })
+  .refine((value) => Object.keys(value).length > 0, {
+    message: 'No fields to update',
+  });
+
+export type UpdateReportInput = z.infer<typeof updateReportSchema>;
+
 export const CHECKIN_STATUSES = ['pending', 'arrived', 'missed', 'alerted'] as const;
 
 /** `userId` is absent by design: the handler takes it from the session. */
