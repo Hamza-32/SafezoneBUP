@@ -67,12 +67,10 @@ export default function SafezoneBUPApp() {
       toast.success("Login successful!")
       
       // Navigate to appropriate dashboard based on user's role from the response
-      if (userData.role === "admin") {
+      if (userData.role === "admin" || userData.role === "security") {
         setCurrentPage("admin-dashboard")
-      } else if (userData.role === "student") {
-        setCurrentPage("student-dashboard")
       } else {
-        setCurrentPage("home")
+        setCurrentPage("student-dashboard")
       }
     } catch (error: any) {
       console.error("Login error:", error)
@@ -102,12 +100,10 @@ export default function SafezoneBUPApp() {
       setUser(userData)
       toast.success("Registration successful!")
       
-      if (userData.role === "admin") {
+      if (userData.role === "admin" || userData.role === "security") {
         setCurrentPage("admin-dashboard")
-      } else if (userData.role === "student") {
-        setCurrentPage("student-dashboard")
       } else {
-        setCurrentPage("home")
+        setCurrentPage("student-dashboard")
       }
     } catch (error: any) {
       console.error("Signup error:", error)
@@ -201,7 +197,7 @@ export default function SafezoneBUPApp() {
         )
 
       case "admin-dashboard":
-        return user?.role === "admin" ? <AdminDashboard user={user} /> : <Homepage onNavigate={handleNavigate} />
+        return user?.role === "admin" || user?.role === "security" ? <AdminDashboard user={user} /> : <Homepage onNavigate={handleNavigate} />
 
       case "student-dashboard":
         return user?.role === "student" ? <StudentDashboard user={user} /> : <Homepage onNavigate={handleNavigate} />

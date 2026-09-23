@@ -4,13 +4,13 @@ export const dynamic = 'force-dynamic';
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';
 import { 
-  withAdmin,
+  withStaff,
   successResponse,
   errorResponse
 } from '@/lib/api-middleware';
 
 export async function GET(request: NextRequest) {
-  return withAdmin(request, async (req: NextRequest, user: any) => {
+  return withStaff(request, async (req: NextRequest, user: any) => {
     try {
       // Get overall statistics
       const [totalUsers] = await Database.query("SELECT COUNT(*) as count FROM users WHERE role = 'student'");

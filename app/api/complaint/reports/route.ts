@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';
 import { 
-  withAdmin,
+  withStaff,
   successResponse,
   errorResponse
 } from '@/lib/api-middleware';
@@ -30,7 +30,7 @@ function readJsonColumn(value: unknown): unknown {
 
 
 export async function GET(request: NextRequest) {
-  return withAdmin(request, async (req: NextRequest, user: any) => {
+  return withStaff(request, async (req: NextRequest, user: any) => {
     try {
       const { searchParams } = new URL(request.url);
       const status = searchParams.get('status');

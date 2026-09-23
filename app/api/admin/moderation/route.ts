@@ -4,14 +4,14 @@ export const dynamic = 'force-dynamic';
 import { NextRequest } from 'next/server';
 import { Database } from '@/lib/database';
 import {
-  withAdmin,
+  withStaff,
   logAction,
   successResponse,
   errorResponse
 } from '@/lib/api-middleware';
 
 export async function GET(request: NextRequest) {
-  return withAdmin(request, async (req: NextRequest, user: any) => {
+  return withStaff(request, async (req: NextRequest, user: any) => {
     try {
       const { searchParams } = new URL(request.url);
       const type = searchParams.get('type') || 'all'; // 'posts', 'comments', 'all'
@@ -92,7 +92,7 @@ export async function GET(request: NextRequest) {
 
 // Moderate content
 export async function POST(request: NextRequest) {
-  return withAdmin(request, async (req: NextRequest, user: any) => {
+  return withStaff(request, async (req: NextRequest, user: any) => {
     try {
       const body = await request.json();
       const { action, type, id, moderationNote } = body;

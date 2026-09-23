@@ -30,6 +30,7 @@ dotenv.config({ quiet: true });
 
 import crypto from 'crypto';
 import { Database } from '../lib/database';
+import { hashPassword } from '../lib/api-middleware';
 
 // ---------------------------------------------------------------------------
 // Harness
@@ -575,6 +576,43 @@ async function main(): Promise<void> {
     Array.isArray(studentPosts) && studentPosts.every((post: any) => post.status === 'approved'),
     `${studentPosts.length} post(s)`
   );
+
+  // -------------------------------------------------------------------------
+  // Campus security is a responder, not a bystander.
+  //
+  // notifyResponders pages role IN ('admin','security') for every emergency,
+  // SOS and missed check-in, but every screen that would show them was gated
+  // on withAdmin. An officer was paged and then refused the report — 403 on
+  // the dashboard and on all three listings. requireStaff existed and was
+  // unused.
+  section('Campus security can reach what it is paged about');
+
+  const officer = newAccount('officer');
+  const officerHash = await hashPassword(officer.password);
+
+  await Database.query(
+    `INSERT INTO users (firstName, lastName, email, password, role, isVerified)
+     VALUES (?, ?, ?, ?, 'security', true)`,
+    [officer.firstName, officer.lastName, officer.email, officerHash]
+  );
+
+  const officerLogin = await call('POST', '/api/auth/login', {
+    body: { email: officer.email, password: officer.password },
+  });
+
+  check('a security account can sign in', officerLogin.status === 200, `status ${officerLogin.status}`);
+
+  const officerSession: Session = { cookie: officerLogin.setCookie };
+
+  for (const path of [
+    '/api/admin/dashboard',
+    '/api/emergency/reports',
+    '/api/complaint/reports',
+    '/api/admin/moderation',
+  ]) {
+    const response = await call('GET', path, { session: officerSession });
+    check(`security may read ${path}`, response.status === 200, `status ${response.status}`);
+  }
 
   // -------------------------------------------------------------------------
   section('Removed endpoints are gone');

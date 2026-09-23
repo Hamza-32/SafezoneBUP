@@ -126,11 +126,19 @@ export function Navbar({ user, onNavigate, onLogout }: NavbarProps) {
                   <div className="px-3 py-2">
                     <p className="text-sm font-medium text-foreground">{user.name || `${user.firstName} ${user.lastName}`}</p>
                     <p className="text-xs text-muted-foreground">
-                      {user.role === "admin" ? "Administrator" : `Student ID: ${user.studentId}`}
+                      {user.role === "admin"
+                        ? "Administrator"
+                        : user.role === "security"
+                          ? "Campus Security"
+                          : `Student ID: ${user.studentId}`}
                     </p>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => onNavigate(user.role === "admin" ? "admin-dashboard" : "student-dashboard")}>
+                  <DropdownMenuItem onClick={() => onNavigate(
+                      user.role === "admin" || user.role === "security"
+                        ? "admin-dashboard"
+                        : "student-dashboard"
+                    )}>
                     <User className="mr-2 h-4 w-4" />
                     Dashboard
                   </DropdownMenuItem>
