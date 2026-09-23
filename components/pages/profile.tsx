@@ -42,12 +42,10 @@ export default function Profile({ userData, onNavigate, onUpdateProfile }: Profi
 
   const handleCancel = () => {
     setFormData({
-      name: userData.name || "",
-      email: userData.email || "",
-      phone: userData.phone || "",
-      department: userData.department || "",
-      personalNumber: userData.personalNumber || "",
-      address: userData.address || "",
+      firstName: userData.firstName || "",
+      lastName: userData.lastName || "",
+      phoneNumber: userData.phoneNumber || "",
+      studentId: userData.studentId || "",
     })
     setIsEditing(false)
   }
@@ -188,37 +186,21 @@ export default function Profile({ userData, onNavigate, onUpdateProfile }: Profi
 
               {userData.role === "student" && (
                 <div className="space-y-2">
-                  <Label htmlFor="department">Department</Label>
+                  <Label htmlFor="studentId">Student ID</Label>
                   {isEditing ? (
                     <Input
-                      id="department"
-                      value={formData.department}
-                      onChange={(e) => setFormData({ ...formData, department: e.target.value })}
+                      id="studentId"
+                      value={formData.studentId}
+                      onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
                     />
                   ) : (
                     <div className="flex items-center gap-2 p-2 border rounded-md bg-muted/20">
                       <GraduationCap className="size-4 text-muted-foreground" />
-                      <span>{userData.department || "Not provided"}</span>
+                      <span>{userData.studentId || "Not provided"}</span>
                     </div>
                   )}
                 </div>
               )}
-
-              <div className="space-y-2">
-                <Label htmlFor="address">Address</Label>
-                {isEditing ? (
-                  <Input
-                    id="address"
-                    value={formData.address}
-                    onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  />
-                ) : (
-                  <div className="flex items-center gap-2 p-2 border rounded-md bg-muted/20">
-                    <MapPin className="size-4 text-muted-foreground" />
-                    <span>{userData.address || "Not provided"}</span>
-                  </div>
-                )}
-              </div>
             </div>
           </CardContent>
         </Card>
@@ -226,26 +208,40 @@ export default function Profile({ userData, onNavigate, onUpdateProfile }: Profi
         {/* Account Statistics */}
         <Card className="shadow-md">
           <CardHeader>
-            <CardTitle className="text-xl">Account Statistics</CardTitle>
-            <CardDescription>Your activity summary on SafeZone</CardDescription>
+            <CardTitle className="text-xl">Account</CardTitle>
+            <CardDescription>What this account is and how it stands</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid md:grid-cols-4 gap-4">
+            {/* These four tiles were the literals 12 / 8 / 3 / 45 — "Total
+                Reports", "Verified Reports", "Pending Verification" and "Days
+                Active" — shown identically to every user regardless of what
+                they had actually done. Nothing counted reports here, so the
+                figures are replaced with facts the account record carries. */}
+            <div className="grid md:grid-cols-3 gap-4">
               <div className="text-center p-4 bg-muted/20 rounded-lg">
-                <div className="text-2xl font-bold text-[#B41F23] mb-1">12</div>
-                <p className="text-sm text-muted-foreground">Total Reports</p>
+                <div className="text-2xl font-bold text-[#B41F23] mb-1">
+                  {userData.createdAt
+                    ? Math.max(
+                        0,
+                        Math.floor(
+                          (Date.now() - new Date(userData.createdAt).getTime()) / 86400000
+                        )
+                      )
+                    : "—"}
+                </div>
+                <p className="text-sm text-muted-foreground">Days since joining</p>
               </div>
               <div className="text-center p-4 bg-muted/20 rounded-lg">
-                <div className="text-2xl font-bold text-green-600 mb-1">8</div>
-                <p className="text-sm text-muted-foreground">Verified Reports</p>
+                <div className="text-2xl font-bold text-green-600 mb-1">
+                  {userData.isVerified ? "Verified" : "Pending"}
+                </div>
+                <p className="text-sm text-muted-foreground">Account status</p>
               </div>
               <div className="text-center p-4 bg-muted/20 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600 mb-1">3</div>
-                <p className="text-sm text-muted-foreground">Pending Verification</p>
-              </div>
-              <div className="text-center p-4 bg-muted/20 rounded-lg">
-                <div className="text-2xl font-bold text-[#8C897A] mb-1">45</div>
-                <p className="text-sm text-muted-foreground">Days Active</p>
+                <div className="text-2xl font-bold text-blue-600 mb-1 capitalize">
+                  {userData.role || "student"}
+                </div>
+                <p className="text-sm text-muted-foreground">Role</p>
               </div>
             </div>
           </CardContent>
