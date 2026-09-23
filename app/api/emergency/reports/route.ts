@@ -28,6 +28,49 @@ function readJsonColumn(value: unknown): unknown {
   }
 }
 
+/**
+ * Strip the reporter's identity from a row they asked to submit anonymously.
+ *
+ * The form says "Submit anonymously — your identity will be protected", and
+ * this endpoint used to build reporterName from the joined user row whatever
+ * the flag said, while `SELECT er.*` carried userId and the join added
+ * firstName, lastName and studentId. The one audience the promise is made
+ * against — staff — received the reporter's name, student id and user id.
+ *
+ * Anonymity is withheld here rather than hidden in the interface, the same
+ * way the lost-and-found board does it, so a client cannot opt out of it.
+ */
+function presentReport(row: any) {
+  const anonymous = Boolean(row.isAnonymous);
+
+  const {
+    firstName,
+    lastName,
+    studentId,
+    userId,
+    assignedAdminFirstName,
+    assignedAdminLastName,
+    ...rest
+  } = row;
+
+  return {
+    ...rest,
+    // Kept for a named reporter so staff can follow up, dropped entirely for
+    // an anonymous one.
+    userId: anonymous ? undefined : userId,
+    firstName: anonymous ? undefined : firstName,
+    lastName: anonymous ? undefined : lastName,
+    studentId: anonymous ? undefined : studentId,
+    attachments: readJsonColumn(row.attachments),
+    reporterName:
+      anonymous || !(firstName && lastName) ? 'Anonymous' : `${firstName} ${lastName}`,
+    assignedAdminName:
+      assignedAdminFirstName && assignedAdminLastName
+        ? `${assignedAdminFirstName} ${assignedAdminLastName}`
+        : null,
+  };
+}
+
 
 export async function GET(request: NextRequest) {
   return withStaff(request, async (req: NextRequest, user: any) => {
@@ -86,16 +129,7 @@ export async function GET(request: NextRequest) {
       const [{ total }] = await Database.query(countQuery, params.slice(0, -2));
 
       // Process reports
-      const processedReports = reports.map(report => ({
-        ...report,
-        attachments: readJsonColumn(report.attachments),
-        reporterName: report.firstName && report.lastName 
-          ? `${report.firstName} ${report.lastName}` 
-          : 'Anonymous',
-        assignedAdminName: report.assignedAdminFirstName && report.assignedAdminLastName
-          ? `${report.assignedAdminFirstName} ${report.assignedAdminLastName}`
-          : null
-      }));
+      const processedReports = reports.map(presentReport);
 
       return successResponse({
         reports: processedReports,

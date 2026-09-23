@@ -130,6 +130,26 @@ function newAccount(label: string) {
 }
 
 async function cleanup(): Promise<void> {
+  // Anonymous rows have no owner, so they are matched on the run id this
+  // script puts in every title it creates. Matching on the EMG- prefix
+  // instead would delete every real report in the table.
+  //
+  // This runs BEFORE the account lookup and is not guarded by it. Both guards
+  // below used to sit above these deletes, so a run that failed before it
+  // could register anyone — a rate limit is enough — left its anonymous
+  // reports in the database for good. Eight had accumulated that way.
+  const runTag = `verify-${runId}%`;
+
+  await Database.query('DELETE FROM emergency_reports WHERE title LIKE ?', [runTag]).catch(
+    () => undefined
+  );
+  await Database.query('DELETE FROM complaints WHERE title LIKE ?', [runTag]).catch(
+    () => undefined
+  );
+  await Database.query('DELETE FROM discussion_posts WHERE title LIKE ?', [runTag]).catch(
+    () => undefined
+  );
+
   if (testEmails.length === 0) return;
 
   const placeholders = testEmails.map(() => '?').join(', ');
@@ -143,21 +163,6 @@ async function cleanup(): Promise<void> {
   if (ids.length === 0) return;
 
   const idPlaceholders = ids.map(() => '?').join(', ');
-
-  // Anonymous reports have no owner, so they are matched on the run id that
-  // this script puts in every title it creates. Matching on the EMG- prefix
-  // instead would delete every real report in the table.
-  const runTag = `verify-${runId}%`;
-
-  await Database.query('DELETE FROM emergency_reports WHERE title LIKE ?', [runTag]).catch(
-    () => undefined
-  );
-  await Database.query('DELETE FROM complaints WHERE title LIKE ?', [runTag]).catch(
-    () => undefined
-  );
-  await Database.query('DELETE FROM discussion_posts WHERE title LIKE ?', [runTag]).catch(
-    () => undefined
-  );
 
   await Database.query(`DELETE FROM safety_checkins WHERE userId IN (${idPlaceholders})`, ids);
   await Database.query(`DELETE FROM lost_and_found WHERE userId IN (${idPlaceholders})`, ids).catch(
@@ -660,6 +665,77 @@ async function main(): Promise<void> {
     stillOwner.status === 200,
     `status ${stillOwner.status}`
   );
+
+  // -------------------------------------------------------------------------
+  // Anonymity is kept from the audience it is promised against.
+  //
+  // The form says "Submit anonymously — your identity will be protected".
+  // The staff listing built reporterName from the joined user row whatever
+  // the flag said, and SELECT er.* carried userId while the join added
+  // firstName, lastName and studentId. Staff saw everything.
+  section('Anonymous reports stay anonymous to staff');
+
+  const namedReport = await call('POST', '/api/emergency/report', {
+    session: aliceSession,
+    body: {
+      title: `verify-${runId} named report`,
+      description: 'Filed under the reporter own name.',
+      category: 'other',
+      location: 'Test location',
+      isAnonymous: false,
+    },
+  });
+
+  const hiddenReport = await call('POST', '/api/emergency/report', {
+    session: aliceSession,
+    body: {
+      title: `verify-${runId} anonymous report`,
+      description: 'Filed with the anonymity switch on.',
+      category: 'other',
+      location: 'Test location',
+      isAnonymous: true,
+    },
+  });
+
+  check('both test reports were accepted', namedReport.status === 201 && hiddenReport.status === 201,
+    `${namedReport.status} / ${hiddenReport.status}`);
+
+  const responder = newAccount('responder');
+  await call('POST', '/api/auth/register', { body: responder });
+
+  // Registration cannot grant a role — that is asserted above — so the
+  // promotion happens directly, the way an administrator would do it.
+  await Database.query("UPDATE users SET role = 'security' WHERE email = ?", [responder.email]);
+
+  const staffLogin = await call('POST', '/api/auth/login', {
+    body: { email: responder.email, password: responder.password },
+  });
+  const staffSession: Session = { cookie: staffLogin.setCookie };
+
+  check('a promoted responder can sign in', staffLogin.status === 200, `status ${staffLogin.status}`);
+
+  const staffView = await call('GET', '/api/emergency/reports?limit=50', { session: staffSession });
+  const staffReportsList = staffView.body?.data?.reports ?? [];
+  const anonRow = staffReportsList.find((r: any) => r.title === `verify-${runId} anonymous report`);
+  const namedRow = staffReportsList.find((r: any) => r.title === `verify-${runId} named report`);
+
+  check('staff can see the anonymous report itself', Boolean(anonRow), 'row missing');
+
+  if (anonRow) {
+    check('the anonymous report shows no reporter name', anonRow.reporterName === 'Anonymous',
+      String(anonRow.reporterName));
+    check('the anonymous report carries no first or last name',
+      !anonRow.firstName && !anonRow.lastName,
+      `${anonRow.firstName ?? ''} ${anonRow.lastName ?? ''}`);
+    check('the anonymous report carries no student id', !anonRow.studentId, String(anonRow.studentId));
+    check('the anonymous report carries no user id', !anonRow.userId, String(anonRow.userId));
+  }
+
+  if (namedRow) {
+    check('a named report still identifies its reporter',
+      typeof namedRow.reporterName === 'string' && namedRow.reporterName !== 'Anonymous',
+      String(namedRow.reporterName));
+  }
 
   // -------------------------------------------------------------------------
   section('Removed endpoints are gone');
