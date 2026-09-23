@@ -214,6 +214,31 @@ Setting `RATE_LIMIT_REQUIRE_SHARED=true` reverses that, and requests get a
 503 while the store is unavailable. It is off by default and is not
 recommended here.
 
+## Where the functions run
+
+`vercel.json` pins them to `sin1`, Singapore, because that is where both
+Supabase and Upstash are. Vercel defaults new projects to `iad1`, Washington
+D.C., which put every database query and every rate-limit check across the
+Pacific and back.
+
+Measured against the live deployment, same endpoint, before and after:
+
+| | iad1 (Washington) | sin1 (Singapore) |
+| --- | --- | --- |
+| Cold `SELECT 1` | 1644ms | 60ms |
+| Warm `SELECT 1` | 223ms | — |
+
+The database answers that query in well under a millisecond, so almost all of
+what was being measured was distance.
+
+Latency is not only a speed question here. The rate limiter abandons a lookup
+after 1500ms and falls back to per-instance counters, and a cold
+Washington-to-Singapore round trip was consuming most of that budget — so the
+shared limits were least reliable exactly when an instance was cold.
+
+Keep this in step with the data. If Supabase or the Redis store ever moves
+region, `vercel.json` has to move with it.
+
 ## Alert delivery
 
 An emergency report, an SOS and an unconfirmed check-in each write a row to
