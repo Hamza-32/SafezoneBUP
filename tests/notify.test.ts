@@ -105,22 +105,72 @@ describe('recipient handling', () => {
       ALERT
     );
 
-    const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
-    expect(body.to).toEqual(['good@bup.edu.bd', 'also.good@bup.edu.bd']);
+    const addressed = fetchSpy.mock.calls.map(
+      (call) => JSON.parse((call[1] as RequestInit).body as string).to[0]
+    );
+    expect(addressed).toEqual(['good@bup.edu.bd', 'also.good@bup.edu.bd']);
   });
 
-  it('sends one message to everyone rather than one each', async () => {
+  // Deliberately one request each, not one addressed to everyone. Resend
+  // rejects an entire request if any single address is unroutable, so batching
+  // let one stale responder silence the alert for all the others.
+  it('sends one request per recipient', async () => {
     configure();
     const fetchSpy = vi
       .spyOn(globalThis, 'fetch')
       .mockResolvedValue(new Response('{}', { status: 200 }));
 
-    await deliverAlert(
+    const result = await deliverAlert(
       [{ email: 'a@bup.edu.bd' }, { email: 'b@bup.edu.bd' }, { email: 'c@bup.edu.bd' }],
       ALERT
     );
 
-    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(result).toEqual({ sent: 3, skipped: 0 });
+
+    for (const call of fetchSpy.mock.calls) {
+      expect(JSON.parse((call[1] as RequestInit).body as string).to).toHaveLength(1);
+    }
+  });
+
+  it('still reaches the others when one address is rejected', async () => {
+    configure();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation((_url, init) => {
+      const body = JSON.parse((init as RequestInit).body as string);
+      return Promise.resolve(
+        body.to[0] === 'stale@bup.edu.bd'
+          ? new Response('invalid recipient', { status: 422 })
+          : new Response('{}', { status: 200 })
+      );
+    });
+
+    const result = await deliverAlert(
+      [{ email: 'stale@bup.edu.bd' }, { email: 'live@bup.edu.bd' }],
+      ALERT
+    );
+
+    expect(result).toEqual({ sent: 1, skipped: 1 });
+  });
+
+  it('still reaches the others when one send throws', async () => {
+    configure();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    vi.spyOn(globalThis, 'fetch').mockImplementation((_url, init) => {
+      const body = JSON.parse((init as RequestInit).body as string);
+      return body.to[0] === 'broken@bup.edu.bd'
+        ? Promise.reject(new Error('ECONNRESET'))
+        : Promise.resolve(new Response('{}', { status: 200 }));
+    });
+
+    const result = await deliverAlert(
+      [{ email: 'broken@bup.edu.bd' }, { email: 'live@bup.edu.bd' }],
+      ALERT
+    );
+
+    expect(result).toEqual({ sent: 1, skipped: 1 });
   });
 });
 

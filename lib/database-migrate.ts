@@ -375,6 +375,47 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    id: '006-checkin-notified-at',
+    description:
+      'Track whether an escalated check-in was actually notified, so a crash between the two can be retried',
+    up: async () => {
+      // Escalation claimed the row first — UPDATE ... SET status = 'missed'
+      // WHERE status = 'pending' — and notified afterwards. That ordering
+      // makes the claim safe against two workers racing, but it means a
+      // serverless function frozen between the two steps leaves a check-in
+      // marked missed that nobody was ever told about. The next sweep skips
+      // it, because it is no longer pending. The student is recorded as
+      // overdue and no responder knows.
+      //
+      // notifiedAt closes it: the sweep now also picks up rows that are
+      // missed but not yet notified, so an interrupted escalation is retried
+      // instead of lost.
+      if (!(await tableExists('safety_checkins'))) {
+        console.log('   skipped safety_checkins (table does not exist yet)');
+        return;
+      }
+
+      if (await columnExists('safety_checkins', 'notifiedAt')) {
+        console.log('   safety_checkins.notifiedAt already present');
+        return;
+      }
+
+      await Database.query(
+        'ALTER TABLE safety_checkins ADD COLUMN notifiedAt TIMESTAMPTZ'
+      );
+
+      // Rows already marked missed predate this column. Treat them as
+      // notified rather than re-alerting responders about old check-ins.
+      const backfilled = await Database.query(
+        "UPDATE safety_checkins SET notifiedAt = updatedAt WHERE status = 'missed' AND notifiedAt IS NULL"
+      );
+
+      console.log(
+        `   safety_checkins.notifiedAt added, ${backfilled.affectedRows ?? 0} existing row(s) backfilled`
+      );
+    },
+  },
 ];
 
 /** Where the connection settings currently point. */

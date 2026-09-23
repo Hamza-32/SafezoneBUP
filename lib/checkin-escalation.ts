@@ -34,6 +34,7 @@ export interface EscalationResult {
 
 interface OverdueCheckin {
   id: number;
+  status: string;
   userId: number;
   location: string | null;
   expectedArrivalTime: string;
@@ -50,14 +51,28 @@ interface OverdueCheckin {
  * count tells us which one won.
  */
 export async function escalateOverdueCheckins(): Promise<EscalationResult> {
+  // Two cases, not one.
+  //
+  //   pending and overdue           — a check-in nobody has escalated yet
+  //   missed with no notifiedAt     — escalation claimed the row and then
+  //                                   died before telling anyone
+  //
+  // The second only exists because claiming and notifying cannot be one
+  // atomic step across a database and an email provider. Without it, a
+  // serverless function frozen between the two leaves a student recorded as
+  // overdue with no responder aware of it, and every later sweep skips the
+  // row because it is no longer pending.
   const overdue: OverdueCheckin[] = await Database.query(
-    `SELECT c.id, c.userId, c.location, c.expectedArrivalTime,
+    `SELECT c.id, c.userId, c.location, c.expectedArrivalTime, c.status,
             u.firstName, u.lastName, u.phoneNumber
        FROM safety_checkins c
        JOIN users u ON u.id = c.userId
-      WHERE c.status = 'pending'
-        AND c.expectedArrivalTime IS NOT NULL
+      WHERE c.expectedArrivalTime IS NOT NULL
         AND c.expectedArrivalTime < NOW() - (? || ' minutes')::interval
+        AND (
+          c.status = 'pending'
+          OR (c.status = 'missed' AND c.notifiedAt IS NULL)
+        )
       ORDER BY c.expectedArrivalTime ASC
       LIMIT 100`,
     [String(GRACE_PERIOD_MINUTES)]
@@ -79,15 +94,21 @@ export async function escalateOverdueCheckins(): Promise<EscalationResult> {
   for (const checkin of overdue) {
     // Claim the row first. If another caller got there first this updates
     // nothing, and we skip it rather than sending a duplicate alert.
-    const claim = await Database.query(
-      `UPDATE safety_checkins
-          SET status = 'missed', updatedAt = NOW()
-        WHERE id = ? AND status = 'pending'`,
-      [checkin.id]
-    );
+    if (checkin.status === 'pending') {
+      const claim = await Database.query(
+        `UPDATE safety_checkins
+            SET status = 'missed', updatedAt = NOW()
+          WHERE id = ? AND status = 'pending'`,
+        [checkin.id]
+      );
 
-    if (!claim.affectedRows) continue;
-    escalated += 1;
+      // Another worker got there first. It owns the notification too.
+      if (!claim.affectedRows) continue;
+      escalated += 1;
+    }
+    // Otherwise this row is already 'missed' and was picked up because
+    // notifiedAt is null — a previous pass claimed it and never finished.
+    // It is not counted again; only the notification is retried.
 
     if (responders.length === 0) {
       console.warn(
@@ -119,6 +140,13 @@ export async function escalateOverdueCheckins(): Promise<EscalationResult> {
           )
         )
       );
+      // Only now is this check-in fully escalated. Until notifiedAt is set,
+      // the next sweep will pick it up again and retry.
+      await Database.query(
+        'UPDATE safety_checkins SET notifiedAt = NOW() WHERE id = ?',
+        [checkin.id]
+      );
+
       notified += responders.length;
       pushed.push(`${name} (check-in ${checkin.id})`);
     } catch (error) {

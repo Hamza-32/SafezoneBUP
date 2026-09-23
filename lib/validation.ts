@@ -128,6 +128,50 @@ export const updateProfileSchema = z.object({
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
+// Pagination
+// ---------------------------------------------------------------------------
+
+/**
+ * Read page and limit from a query string, safely.
+ *
+ * Three listing endpoints did `parseInt(searchParams.get('limit') || '20')`
+ * and used the result directly. `?limit=abc` gives NaN, which reaches the
+ * database as a bad LIMIT and returns a 500; `?limit=999999` is accepted and
+ * makes the server do real work on request, which is a cheap way to load it
+ * up. Neither needs an account.
+ *
+ * Anything unparseable falls back to the default rather than erroring — a
+ * malformed page number is not worth failing a request over — and the upper
+ * bound is a hard ceiling.
+ */
+export function parsePagination(
+  searchParams: URLSearchParams,
+  options: { defaultLimit?: number; maxLimit?: number } = {}
+): { page: number; limit: number; offset: number } {
+  const defaultLimit = options.defaultLimit ?? 20;
+  const maxLimit = options.maxLimit ?? 100;
+
+  const asPositiveInt = (raw: string | null, fallback: number, max: number): number => {
+    // Number(null) is 0 and Number('') is 0, neither of which is NaN, so a
+    // missing parameter would otherwise clamp to 1 instead of falling back to
+    // the default. Absent and malformed both mean "use the default".
+    if (raw === null || raw.trim() === '') return fallback;
+
+    const value = Number(raw);
+    if (!Number.isFinite(value)) return fallback;
+
+    return Math.min(Math.max(Math.trunc(value), 1), max);
+  };
+
+  // A page number far beyond the data is harmless — it returns nothing — but
+  // it still has to be finite, so it is capped too.
+  const page = asPositiveInt(searchParams.get('page'), 1, 1_000_000);
+  const limit = asPositiveInt(searchParams.get('limit'), defaultLimit, maxLimit);
+
+  return { page, limit, offset: (page - 1) * limit };
+}
+
+// ---------------------------------------------------------------------------
 // Triage: what staff may change about a report
 // ---------------------------------------------------------------------------
 

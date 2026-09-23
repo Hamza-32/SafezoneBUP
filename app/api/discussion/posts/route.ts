@@ -10,6 +10,7 @@ import {
   errorResponse,
   withAuth
 } from '@/lib/api-middleware';
+import { parsePagination } from '@/lib/validation';
 
 /** Statuses a moderator may ask for. Anyone else gets approved posts only. */
 const MODERATOR_STATUSES = new Set(['pending', 'rejected', 'flagged', 'approved']);
@@ -36,9 +37,9 @@ export async function GET(request: NextRequest) {
 
     const status =
       isModerator && MODERATOR_STATUSES.has(requestedStatus) ? requestedStatus : 'approved';
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const offset = (page - 1) * limit;
+    const { page, limit, offset } = parsePagination(searchParams, {
+      defaultLimit: 10,
+    });
 
     let query = `
       SELECT 

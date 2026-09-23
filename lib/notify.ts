@@ -149,6 +149,50 @@ export async function deliverAlert(
     return { sent: 0, skipped: addresses.length };
   }
 
+  const body = {
+    from: config.from,
+    subject: alert.subject,
+    text: renderText(alert),
+    html: renderHtml(alert),
+  };
+
+  // One request per recipient, deliberately, even though addressing them all
+  // in a single call would use less of the free tier's quota.
+  //
+  // Resend rejects the whole request if any one address is unroutable, so a
+  // single stale responder — someone who left, a typo in an address nobody
+  // has checked in months — silenced the alert for every other responder at
+  // the same time. That is the wrong way round: the more responders there
+  // are, the more likely it becomes that none of them hear about an
+  // emergency.
+  //
+  // Sent concurrently, so the wall-clock cost is one request, not N.
+  const results = await Promise.all(
+    addresses.map((address) => sendOne(config, address, body))
+  );
+
+  const sent = results.filter(Boolean).length;
+  const skipped = results.length - sent;
+
+  if (skipped > 0) {
+    console.error(
+      `Alert reached ${sent} of ${results.length} responder(s). ` +
+        'The rest were not delivered; check the provider log for which.'
+    );
+  }
+
+  return { sent, skipped };
+}
+
+/**
+ * Deliver to one address. Returns whether it was accepted.
+ * Never throws: a failure for one recipient must not affect the others.
+ */
+async function sendOne(
+  config: DeliveryConfig,
+  address: string,
+  body: { from: string; subject: string; text: string; html: string }
+): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
 
@@ -159,15 +203,7 @@ export async function deliverAlert(
         Authorization: `Bearer ${config.apiKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        from: config.from,
-        // One message addressed to everyone rather than one per responder:
-        // it is a single API call, and the free tier counts calls.
-        to: addresses,
-        subject: alert.subject,
-        text: renderText(alert),
-        html: renderHtml(alert),
-      }),
+      body: JSON.stringify({ ...body, to: [address] }),
       signal: controller.signal,
       cache: 'no-store',
     });
@@ -175,20 +211,20 @@ export async function deliverAlert(
     if (!response.ok) {
       const detail = await response.text().catch(() => '');
       console.error(
-        `Alert delivery failed with HTTP ${response.status}. ${detail.slice(0, 200)}`
+        `Alert to ${address} failed with HTTP ${response.status}. ${detail.slice(0, 200)}`
       );
-      return { sent: 0, skipped: addresses.length };
+      return false;
     }
 
-    return { sent: addresses.length, skipped: 0 };
+    return true;
   } catch (error) {
     const aborted = error instanceof Error && error.name === 'AbortError';
     console.error(
       aborted
-        ? `Alert delivery timed out after ${SEND_TIMEOUT_MS}ms`
-        : `Alert delivery threw: ${error instanceof Error ? error.message : String(error)}`
+        ? `Alert to ${address} timed out after ${SEND_TIMEOUT_MS}ms`
+        : `Alert to ${address} threw: ${error instanceof Error ? error.message : String(error)}`
     );
-    return { sent: 0, skipped: addresses.length };
+    return false;
   } finally {
     clearTimeout(timer);
   }

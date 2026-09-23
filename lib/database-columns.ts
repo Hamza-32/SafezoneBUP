@@ -30,6 +30,7 @@ export const CAMEL_CASE_COLUMNS = [
   'phoneNumber',
   'tokenVersion',
   'assignedTo',
+  'notifiedAt',
   'isVerified',
   'profileImage',
   'createdAt',

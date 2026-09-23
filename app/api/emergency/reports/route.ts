@@ -8,6 +8,7 @@ import {
   successResponse,
   errorResponse
 } from '@/lib/api-middleware';
+import { parsePagination } from '@/lib/validation';
 
 /**
  * Read a JSONB column.
@@ -78,8 +79,9 @@ export async function GET(request: NextRequest) {
       const { searchParams } = new URL(request.url);
       const status = searchParams.get('status');
       const priority = searchParams.get('priority');
-      const page = parseInt(searchParams.get('page') || '1');
-      const limit = parseInt(searchParams.get('limit') || '20');
+      const { page, limit, offset } = parsePagination(searchParams, {
+        defaultLimit: 20,
+      });
       
       let query = `
         SELECT 
@@ -114,7 +116,6 @@ export async function GET(request: NextRequest) {
       query += ' ORDER BY er.createdAt DESC';
 
       // Add pagination
-      const offset = (page - 1) * limit;
       query += ' LIMIT ? OFFSET ?';
       params.push(limit, offset);
 
