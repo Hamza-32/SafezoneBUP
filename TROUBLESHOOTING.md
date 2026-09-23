@@ -10,7 +10,7 @@
 1. Restart VS Code completely
 2. In VS Code: Press `Ctrl+Shift+P` → "TypeScript: Restart TS Server"
 3. Delete `.next` folder if it exists: `Remove-Item -Recurse -Force .next`
-4. Run: `npm install --legacy-peer-deps`
+4. Run: `npm install`
 
 ### 2. Module Resolution Issues
 
@@ -65,25 +65,36 @@ There is no local database server: the app runs on Supabase over the network.
 3. Check if all imports are correct
 4. Ensure all components are properly exported
 
-### 6. Backend Server Won't Start
+### 6. An API route returns 500
 
-**Problem**: `npm run dev:backend` fails.
+**Problem**: An API route returns 500.
+
+There is no separate backend process. The API is Next.js route handlers under
+`app/api/`, served by the same `npm run dev`.
 
 **Solutions**:
-1. Check if all backend dependencies are installed
-2. Verify `backend/.env` file exists with correct values
-3. Check `DATABASE_URL` and that the Supabase project is awake
-4. Look for syntax errors in backend files
+1. Read the terminal running `npm run dev` — the real error is logged there,
+   not in the browser
+2. Check `.env.local` has `DATABASE_URL`, `DB_SSL_CA_FILE` and `JWT_SECRET`
+3. Confirm the database is reachable: http://localhost:3000/api/health
+4. Run `npm run db:migrate:status` — a pending migration can leave the schema
+   behind what the code expects
 
 ### 7. Frontend Won't Load
 
-**Problem**: Frontend shows errors or won't start.
+**Problem**: Pages render blank, or the console shows 404s for
+`/_next/static/...` chunks.
+
+Almost always caused by running `npm run build` while `npm run dev` is live.
+The build overwrites `.next` and the dev server then cannot find its own
+chunks.
 
 **Solutions**:
-1. Check browser console for errors
-2. Verify API endpoints are correct in `lib/api-client.ts`
-3. Ensure backend is running on port 3001
-4. Check network tab for failed API calls
+1. Stop the dev server, `Remove-Item -Recurse -Force .next`, start it again
+2. Do not build and serve in the same session
+3. If it persists, check the browser console for a real application error —
+   `app/error.tsx` should catch component failures and show a message rather
+   than a blank page
 
 ## Quick Fixes
 
@@ -92,7 +103,7 @@ There is no local database server: the app runs on Supabase over the network.
 # Remove node_modules and reinstall
 Remove-Item -Recurse -Force node_modules
 Remove-Item package-lock.json
-npm install --legacy-peer-deps
+npm install
 ```
 
 ### Restart Development Environment
@@ -134,18 +145,23 @@ If issues persist:
 3. Ensure all required files exist
 4. Check the GitHub issues or documentation
 
-## Development Workflow
+## Development workflow
 
-1. Start backend: `npm run dev:backend`
-2. Start frontend: `npm run dev:frontend`
-3. Or start both: `npm run dev`
-4. Access frontend: http://localhost:3000
-5. Backend API: http://localhost:3001
+`npm run dev:backend` and `npm run dev:frontend` do not exist. This is a
+single Next.js application: the interface and the API are served by the same
+process on the same port.
 
-## Production Deployment
+1. `npm run dev`
+2. App: http://localhost:3000
+3. API: http://localhost:3000/api/... — health check at `/api/health`
 
-1. Build frontend: `npm run build`
-2. Set production environment variables
-3. Run: `npm start`
+Next.js moves to 3001 if 3000 is taken, and prints the port it chose.
+
+## Production deployment
+
+Deployed on Vercel from the `main` branch; a push is a deploy. See the
+deployment section of [RUNNING.md](RUNNING.md) for the environment variables
+that must be set, and why `DB_SSL_CA` has to be inline rather than a file
+path.
 4. Configure reverse proxy (nginx)
 5. Set up SSL certificates

@@ -1,135 +1,141 @@
-# 🚀 SafeZone Advanced Features - User Guide
+# SafezoneBUP — user guide
 
-## Features Overview
+For students, staff and responders using the platform. If you are looking for
+how to run or deploy it, see [RUNNING.md](RUNNING.md).
 
-Your SafeZone platform now includes powerful new safety features designed to enhance campus security and support:
-
-### 🛡️ Safety Resources Hub
-**Access comprehensive safety information in one place**
-
-- **Emergency Contacts** - Campus security, medical, fire department
-- **Mental Health Resources** - Crisis lines, counseling services  
-- **Safety Tips** - Walking safety, emergency preparedness
-- **Helplines** - Anonymous support for various issues
-- **Campus Resources** - Student services and facilities
-
-**How to use:**
-1. Click "Safety Resources" in the navigation bar
-2. Browse by category or search for specific information
-3. Click contact information to call, email, or visit websites
-4. All resources are categorized and prioritized for easy access
-
-### 💬 Anonymous Discussion Board
-**Safe space for sensitive conversations and peer support**
-
-- **Mental Health Support** - Share experiences anonymously
-- **Academic Stress** - Discuss pressures and coping strategies
-- **Harassment & Discrimination** - Seek support safely
-- **Campus Safety** - Share concerns and tips
-- **General Support** - Any topic needing peer understanding
-
-**How to use:**
-1. Click "Discussion" in the navigation bar
-2. Browse existing posts by category
-3. Click "New Post" to share anonymously
-4. Upvote helpful posts, report inappropriate content
-5. All posts are moderated for safety
-
-### 📍 Safety Check-In System
-**Let others know you're safe when traveling alone**
-
-- **Set Expected Arrival** - Choose your destination and time
-- **Emergency Contact** - Select who to notify if needed
-- **SOS Button** - One-click emergency alert
-- **Status Tracking** - Pending, arrived, missed, alerted
-- **Travel Notes** - Add context about your trip
-
-**How to use:**
-1. Click "Check-In" in the navigation bar
-2. Click "New Check-In" to create one
-3. Set your destination and expected arrival time
-4. Choose an emergency contact
-5. Click "I've Arrived" when you reach safety
-6. Use "SOS" button if you need immediate help
-
-### 🏆 Safety Badges & Gamification
-**Earn recognition for safety-conscious behavior**
-
-- **First Check-In** - Complete your first safety check-in (10 points)
-- **Safety Champion** - Report 5 safety hazards (50 points)
-- **Quiz Master** - Top score in safety quiz (30 points)
-- **Point System** - Accumulate points for various activities
-- **Achievement Tracking** - View your earned badges
-
-### 📞 Emergency Contact Management
-**Quick access to campus emergency services**
-
-- **Campus Security** - 24/7 security services
-- **Medical Emergency** - Health services and first aid
-- **Fire Department** - Fire safety and emergency response
-- **Counseling Services** - Mental health support
-- **Custom Contacts** - Add your own emergency contacts
-
-### ✅ Verification & Trust System
-**Enhanced identity verification for platform security**
-
-- **Student ID Verification** - Upload student ID for verification
-- **Email Verification** - Confirm your institutional email
-- **Two-Factor Authentication** - Additional security layer
-- **Trusted Reporter Status** - Earn credibility through responsible reporting
-- **Credibility Scoring** - Build trust through positive community participation
-
-## Getting Started
-
-### For Students:
-1. **Register** with your student email and ID
-2. **Verify** your account through email confirmation
-3. **Explore** safety resources for your campus
-4. **Join** anonymous discussions for peer support
-5. **Use** check-in system when traveling alone
-6. **Earn** badges by participating in safety activities
-
-### For Administrators:
-1. **Monitor** discussion board for moderation needs
-2. **Update** safety resources with current information
-3. **Review** emergency reports and check-in alerts
-4. **Manage** user verifications and trusted reporter status
-5. **Respond** to flagged content and safety concerns
-
-## Safety Best Practices
-
-### When Using Check-In System:
-- ✅ Always set realistic arrival times
-- ✅ Choose reliable emergency contacts
-- ✅ Update status promptly when you arrive
-- ✅ Use SOS feature only for real emergencies
-- ✅ Add detailed notes about your plans
-
-### When Using Discussion Board:
-- ✅ Post anonymously for sensitive topics
-- ✅ Be respectful and supportive of others
-- ✅ Report inappropriate or harmful content
-- ✅ Upvote helpful and supportive posts
-- ✅ Seek professional help for serious issues
-
-### When Accessing Safety Resources:
-- ✅ Save important contact numbers in your phone
-- ✅ Share resources with friends who might need them
-- ✅ Check for updated information regularly
-- ✅ Know the location of campus safety offices
-- ✅ Familiarize yourself with emergency procedures
-
-## Support & Feedback
-
-If you encounter any issues or have suggestions for improving SafeZone:
-
-- **Report technical issues** through the platform
-- **Contact administrators** for content concerns
-- **Suggest new features** via feedback forms
-- **Share feedback** about user experience
-
-Remember: SafeZone is designed to supplement, not replace, official emergency services. Always call 911 for immediate life-threatening emergencies.
+> **In a life-threatening emergency, call 999 first.** It is Bangladesh's
+> national emergency line — police, fire and ambulance — toll free, at any
+> hour. Use this platform to create a record and alert campus security, not
+> as a substitute for 999.
 
 ---
 
-**SafeZone - Building a safer campus community together** 🛡️
+## Reporting an emergency
+
+**You do not need an account.** Open *Emergency* from the navigation and
+submit. This is deliberate: requiring a login before someone can report an
+emergency would be the wrong tradeoff.
+
+You will be asked for a category, a description and a location. If you allow
+it, your device's GPS coordinates are attached, which is usually more precise
+than a typed location.
+
+Two options are worth knowing:
+
+- **Reporting for someone else.** Say so on the form, so responders know the
+  person needing help may not be the one they can reach.
+- **Anonymous.** Your identity is withheld from responders. You can still
+  submit, and the report is still acted on.
+
+When you submit you are given a **reference code**. Keep it. Signed-in
+reporters can follow their reports to resolution from the student dashboard;
+anonymous reporters cannot, which is the cost of anonymity.
+
+## Safety check-in
+
+Use this when you are travelling somewhere and want someone to notice if you
+do not arrive.
+
+1. Open *Safety Tools → Check-In*
+2. Enter where you are going and the time you expect to arrive
+3. Optionally pick an emergency contact
+
+**If you do not confirm arrival, campus security is told automatically**,
+fifteen minutes after your expected time. The delay exists because being ten
+minutes late is usually just being late.
+
+Confirm arrival from the same screen when you get there.
+
+### SOS
+
+An active check-in has an SOS control. Raising it alerts every responder on
+duty immediately, with your last known destination and phone number.
+
+**An SOS cannot be withdrawn.** Once raised it stays raised, so that nothing —
+a mis-tap, a coerced retraction, a bug — can quietly cancel an alert someone
+is relying on. If you raise one by mistake, say so; do not expect to undo it.
+
+## Filing a complaint
+
+*Safety Tools → File Complaint*, for harassment, misconduct, facility
+problems and similar. Complaints can be filed anonymously, and can name
+another student by student ID where relevant.
+
+You can follow your complaint's status if you are signed in.
+
+## Lost & found
+
+*Safety Tools → Lost & Found*. Post something you have lost or found, browse
+and search what others have posted, and mark an item resolved once it is
+returned.
+
+**Contact details are only shown to signed-in users.** The board itself is
+public so you can search for your missing bag before creating an account, but
+phone numbers and email addresses are withheld from anonymous visitors so the
+board cannot be harvested.
+
+## Discussion board
+
+*Safety Tools → Discussion Board*, for peer support — mental health, academic
+stress, campus safety. Posts and comments can be anonymous to other students,
+and categories are moderated.
+
+Anonymity here is from other students, not from moderators. Do not treat it as
+a place to say something you would not want a moderator to read.
+
+## Safety resources
+
+*Safety Resources* in the navigation lists verified emergency numbers and
+campus guidance, searchable by category.
+
+Every number listed is one that can be checked against a published source:
+
+| | |
+| --- | --- |
+| **999** | Police, fire and ambulance. Toll free, 24 hours. |
+| **102** | Fire Service & Civil Defence |
+| **109** | Violence against women and children helpline |
+| **16263** | Shastho Batayon health line |
+| **333** | Government information helpline |
+| **+880 9666 790799** | Bangladesh University of Professionals, main line |
+
+> BUP's own campus security and medical extensions are **not listed**, because
+> they are not published anywhere that can be verified. An administrator can
+> add them through the contacts screen once the university supplies them. A
+> number that reaches nobody is worse than no number.
+
+## Your account
+
+**Signing up** gives you report tracking, saved emergency contacts and a
+dashboard. Use your BUP email address.
+
+Passwords need at least 8 characters with an uppercase letter and a digit.
+
+**Verification** (*Account → Verification*) confirms you are a BUP student.
+Verified reporters carry more weight with responders.
+
+**Profile** is where you update your details and change your password.
+
+## For responders and administrators
+
+Staff accounts see the admin dashboard: every emergency report and complaint,
+with ownership and status. Take ownership of a report so other responders can
+see it is being handled.
+
+Notifications appear in the dashboard, and are emailed if the deployment has
+alert delivery configured. Check with whoever administers the deployment
+whether it does — if not, the dashboard is the only place alerts appear, and
+somebody needs to be watching it.
+
+Admins also manage the emergency contacts list, safety resources and
+discussion moderation.
+
+---
+
+## Getting help
+
+Problems with the platform itself go to whoever administers your deployment.
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md) covers setup issues.
+
+**Again: for an actual emergency, call 999.** This platform records and routes;
+999 dispatches.
