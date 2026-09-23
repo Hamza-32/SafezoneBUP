@@ -1,5 +1,6 @@
 import { Database } from './database';
 import bcrypt from 'bcryptjs';
+import { describeTarget } from './database-migrate';
 import crypto from 'crypto';
 
 const BCRYPT_ROUNDS = 12;
@@ -15,10 +16,18 @@ const BCRYPT_ROUNDS = 12;
 /**
  * Whether to create the demonstration accounts.
  *
- * They share a password that is published in this repository, so they are
- * refused outside development unless explicitly requested. An opt-in is the
- * right shape here: someone seeding a demo environment can ask for them,
- * and nobody can create them in production by accident.
+ * They share a password published in this repository, so the question is
+ * whether the DATABASE being written to is a real one — not what NODE_ENV
+ * happens to say on the machine running the script.
+ *
+ * Keying on NODE_ENV was wrong, and wrong in the direction that matters. The
+ * documented way to set up production is to run `npm run db:init` from a
+ * laptop against Supabase, and NODE_ENV is undefined there. The guard passed
+ * and seeded four accounts on a known password straight into the production
+ * database — exactly the case it existed to prevent.
+ *
+ * The target host is the honest signal, and it is the same one the migration
+ * runner already uses to decide whether to demand confirmation.
  */
 export function shouldSeedDemoAccounts(): boolean {
   const requested = process.env.SEED_DEMO_ACCOUNTS;
@@ -26,6 +35,9 @@ export function shouldSeedDemoAccounts(): boolean {
   if (requested !== undefined) {
     return requested === '1' || /^(true|yes|on)$/i.test(requested);
   }
+
+  // A remote database is treated as real, whatever NODE_ENV claims.
+  if (!describeTarget().isLocal) return false;
 
   return process.env.NODE_ENV !== 'production';
 }
