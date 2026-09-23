@@ -26,10 +26,20 @@ export async function GET(request: NextRequest) {
     // delivery provider was configured. A health check that cannot fail is
     // worse than no health check: it actively reassures.
     //
-    // These are reported as degraded rather than unhealthy. Each one has a
-    // deliberate fallback and the application still accepts reports without
-    // it, so returning 503 would be wrong — but so is staying silent.
+    // Two lists, not one. The distinction is whether a person relying on this
+    // application is worse off:
+    //
+    //   degraded — a promise the interface makes is not being kept. An
+    //              emergency will not reach a responder; rate limits are not
+    //              actually shared; a missed check-in is not escalated.
+    //   notes    — something an operator should know that costs a user
+    //              nothing. Absent error collection is the example: every
+    //              feature behaves identically with or without it.
+    //
+    // Flattening them would mean an unconfigured Sentry reads the same as
+    // undeliverable emergency alerts, and then neither gets taken seriously.
     const degraded: string[] = [];
+    const notes: string[] = [];
 
     if (!isAlertDeliveryEnabled()) {
       degraded.push(
@@ -45,18 +55,18 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    if (!isErrorReportingEnabled()) {
-      degraded.push(
-        'Errors are logged but not collected (SENTRY_DSN). A failure in ' +
-          'production is only visible to whoever reads the logs.'
-      );
-    }
-
     if (!process.env.CHECKIN_ESCALATION_SECRET && !process.env.CRON_SECRET) {
       degraded.push(
         'Check-in escalation cannot be triggered by a scheduler ' +
           '(CHECKIN_ESCALATION_SECRET). An unconfirmed check-in is only escalated ' +
           'when a responder loads the dashboard.'
+      );
+    }
+
+    if (!isErrorReportingEnabled()) {
+      notes.push(
+        'Errors are logged but not collected (SENTRY_DSN). Every feature works ' +
+          'the same; a failure is just harder to investigate afterwards.'
       );
     }
 
@@ -68,6 +78,7 @@ export async function GET(request: NextRequest) {
         responseTime: `${dbResponseTime}ms`
       },
       degraded,
+      notes,
       uptime: `${uptimeHours}h ${uptimeMinutes}m ${uptimeSeconds}s`,
       environment: process.env.NODE_ENV || 'development',
       version: '1.0.0',
@@ -77,7 +88,9 @@ export async function GET(request: NextRequest) {
         complaint: '/api/complaint/*',
         admin: '/api/admin/*'
       }
-    }, degraded.length === 0 ? 'API is healthy' : `API is running with ${degraded.length} degraded capability(ies)`);
+    }, degraded.length === 0
+      ? 'API is healthy'
+      : `API is running with ${degraded.length} degraded capability(ies)`);
 
   } catch (error) {
     // The underlying error is logged but never returned: a database error
