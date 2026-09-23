@@ -1,20 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-
-  "_comment_regions": [
-    "Run the functions next to the data.",
-    "",
-    "Vercel defaults every new project to iad1, Washington D.C. Supabase and",
-    "Upstash for this project are both in ap-southeast-1, Singapore, so every",
-    "database query and every rate-limit check was crossing the Pacific twice:",
-    "measured at 235ms warm and 1644ms cold for a SELECT 1 that the database",
-    "answers in under a millisecond.",
-    "",
-    "sin1 is Singapore. A Hobby plan may pick one region, which is all this",
-    "needs. Setting it here rather than in the dashboard keeps it in version",
-    "control, so a re-imported project does not silently revert to Washington.",
-    "",
-    "If the database ever moves, this must move with it."
-  ],
   "regions": ["sin1"]
 }
