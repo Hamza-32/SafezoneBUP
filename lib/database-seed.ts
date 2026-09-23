@@ -475,6 +475,14 @@ export const seedData = async () => {
       );
     }
 
+    // Everything below this point is owned by the demonstration students
+    // (user ids 2, 3 and 4). With the guard above active those accounts do
+    // not exist, and these inserts hit a foreign key violation — INSERT
+    // IGNORE becomes ON CONFLICT DO NOTHING, which suppresses a duplicate
+    // key and not a missing parent — aborting the seed partway and leaving a
+    // half-populated database. Badge definitions are exempt below: they are
+    // reference data with no owner.
+    if (shouldSeedDemoAccounts()) {
     // Seed safety check-ins
     const safetyCheckins = [
       {
@@ -509,6 +517,7 @@ export const seedData = async () => {
         ]
       );
     }
+    }
 
     // Seed safety badges
     console.log('   🏷️ Seeding safety badges...');
@@ -524,6 +533,7 @@ export const seedData = async () => {
       );
     }
 
+    if (shouldSeedDemoAccounts()) {
     // Seed user badges
     console.log('   🎖️ Seeding user badges...');
     await Database.query('INSERT IGNORE INTO user_badges (userId, badgeId) VALUES (?, ?)', [2, 1]);
@@ -620,6 +630,7 @@ export const seedData = async () => {
           item.isAnonymous
         ]
       );
+    }
     }
 
     console.log('✅ Database seeded successfully!');

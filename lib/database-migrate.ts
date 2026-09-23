@@ -327,6 +327,54 @@ const migrations: Migration[] = [
       console.log('   users.tokenVersion added');
     },
   },
+  {
+    id: '005-seed-uniqueness',
+    description:
+      'Add the unique constraints INSERT IGNORE needs, so re-seeding cannot duplicate reference data',
+    up: async () => {
+      // The seed uses INSERT IGNORE, which lib/database translates to
+      // ON CONFLICT DO NOTHING. That only suppresses a conflict where a
+      // constraint exists to conflict with, and three of these tables had
+      // none — so `npm run db:seed` run twice, which db:init does, silently
+      // doubled every row. Six emergency contacts became twelve, and 999
+      // appeared on the safety page twice.
+      //
+      // discussion_categories already had a unique name and was the only one
+      // behaving correctly.
+      const constraints: Array<[string, string, string]> = [
+        ['safety_resources', 'title', 'safety_resources_title_key'],
+        ['emergency_contacts', 'phoneNumber', 'emergency_contacts_phonenumber_key'],
+        ['safety_badges', 'name', 'safety_badges_name_key'],
+      ];
+
+      for (const [table, column, constraint] of constraints) {
+        if (!(await tableExists(table))) {
+          console.log(`   skipped ${table} (table does not exist yet)`);
+          continue;
+        }
+
+        // Collapse any duplicates a previous double-seed created, keeping the
+        // lowest id, or the constraint cannot be added.
+        const removed = await Database.query(
+          `DELETE FROM ${table} a
+                 USING ${table} b
+                 WHERE a.id > b.id AND a.${column} = b.${column}`
+        );
+
+        if (removed.affectedRows) {
+          console.log(`   removed ${removed.affectedRows} duplicate row(s) from ${table}`);
+        }
+
+        await Database.query(
+          `ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${constraint}`
+        );
+        await Database.query(
+          `ALTER TABLE ${table} ADD CONSTRAINT ${constraint} UNIQUE (${column})`
+        );
+        console.log(`   ${table}.${column} is now unique`);
+      }
+    },
+  },
 ];
 
 /** Where the connection settings currently point. */
