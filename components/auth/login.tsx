@@ -65,7 +65,7 @@ export default function Login({ onLogin, onNavigate }: LoginProps) {
           </div>
 
           <div className="space-y-4">
-            {["24/7 Emergency support", "Real-time report tracking", "Anonymous reporting options"].map((feature, i) => (
+            {["Report without an account", "Follow your reports by reference code", "Anonymous reporting options"].map((feature, i) => (
               <div key={i} className="flex items-center gap-3">
                 <div className="h-6 w-6 rounded-full bg-white/20 flex items-center justify-center">
                   <Sparkles className="h-3 w-3 text-white" />

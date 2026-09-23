@@ -259,6 +259,46 @@ const migrations: Migration[] = [
       console.log(`   corrected ${stale.length} safety resource contact block(s)`);
     },
   },
+  {
+    id: '003-add-assigned-to',
+    description:
+      'Add the assignedTo column three report-listing endpoints already join on',
+    up: async () => {
+      // Three routes LEFT JOIN users ON <table>.assignedTo, and the column
+      // exists in no schema revision. Postgres answers "column er.assignedto
+      // does not exist", so GET /api/emergency/reports,
+      // /api/emergency/my-reports and /api/complaint/reports returned 500 on
+      // every call — the student's own report list and the responder's
+      // report list both among them.
+      //
+      // Added rather than removed from the queries, because taking ownership
+      // of a report is the behaviour the interface and the README describe,
+      // and the routes already select assignedAdminFirstName/LastName from
+      // the join. The column was simply never created.
+      for (const table of ['emergency_reports', 'complaints']) {
+        if (!(await tableExists(table))) {
+          console.log(`   skipped ${table} (table does not exist yet)`);
+          continue;
+        }
+
+        if (await columnExists(table, 'assignedTo')) {
+          console.log(`   ${table}.assignedTo already present`);
+          continue;
+        }
+
+        // ON DELETE SET NULL, not CASCADE: removing a staff account must
+        // orphan the assignment, never delete the report.
+        await Database.query(
+          `ALTER TABLE ${table}
+             ADD COLUMN assignedTo INTEGER REFERENCES users(id) ON DELETE SET NULL`
+        );
+        await Database.query(
+          `CREATE INDEX IF NOT EXISTS idx_${table}_assignedto ON ${table} (assignedTo)`
+        );
+        console.log(`   ${table}.assignedTo added`);
+      }
+    },
+  },
 ];
 
 /** Where the connection settings currently point. */

@@ -1,4 +1,5 @@
 "use client"
+import { useEffect, useState } from "react"
 import {
   AlertTriangle,
   Phone,
@@ -24,31 +25,47 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
+import apiClient from "@/lib/api-client"
 
 // Sample student reports data
-const studentReports = [
-  {
-    id: "RPT-001",
-    category: "Medical Emergency",
-    status: "Resolved",
-    timestamp: "2 hours ago",
-    anonymous: false,
-  },
-  {
-    id: "RPT-003",
-    category: "Suspicious Activity",
-    status: "Pending",
-    timestamp: "1 day ago",
-    anonymous: true,
-  },
-  {
-    id: "RPT-005",
-    category: "Infrastructure Issue",
-    status: "In Progress",
-    timestamp: "3 days ago",
-    anonymous: false,
-  },
-]
+// Loaded from /api/emergency/my-reports. This was a hardcoded three-item
+// array and the component never called an API, so a student who filed a real
+// report saw three invented ones instead of their own.
+interface MyReport {
+  id: number
+  referenceId: string | null
+  title: string
+  category: string
+  status: string
+  isAnonymous: boolean
+  createdAt: string
+}
+
+/** Map the API's lowercase status onto the badge's vocabulary. */
+function toBadgeStatus(status: string): string {
+  const map: Record<string, string> = {
+    pending: "Pending",
+    in_progress: "In Progress",
+    resolved: "Resolved",
+    closed: "Resolved",
+  }
+  return map[status] || "Pending"
+}
+
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return "unknown"
+
+  const minutes = Math.floor((Date.now() - then) / 60000)
+  if (minutes < 1) return "just now"
+  if (minutes < 60) return `${minutes} minutes ago`
+
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} hours ago`
+
+  const days = Math.floor(hours / 24)
+  return days === 1 ? "1 day ago" : `${days} days ago`
+}
 
 function StatusBadge({ status }: { status: string }) {
   const config = {
@@ -78,6 +95,40 @@ interface StudentDashboardProps {
 }
 
 export default function StudentDashboard({ user }: StudentDashboardProps = {}) {
+  const [reports, setReports] = useState<MyReport[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const load = async () => {
+      try {
+        const response = await apiClient.getMyEmergencyReports()
+        const data = (response as any).data ?? response
+        if (cancelled) return
+
+        setReports(Array.isArray(data) ? data : data?.reports ?? [])
+        setLoadError(null)
+      } catch (error: any) {
+        if (cancelled) return
+        console.error("Failed to load reports:", error)
+        setLoadError(
+          error?.status === 401
+            ? "Sign in to see your reports."
+            : "Could not load your reports. Retry in a moment."
+        )
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   return (
     <div className="min-h-screen bg-background">
       {/* Main Content */}
@@ -264,7 +315,13 @@ export default function StudentDashboard({ user }: StudentDashboardProps = {}) {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {studentReports.map((report) => (
+              {loading && (
+                <p className="py-8 text-center text-sm text-muted-foreground">Loading your reports…</p>
+              )}
+              {!loading && loadError && (
+                <p className="py-8 text-center text-sm text-primary">{loadError}</p>
+              )}
+              {!loading && !loadError && reports.map((report) => (
                 <div
                   key={report.id}
                   className="flex items-center justify-between p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors group cursor-pointer"
@@ -275,21 +332,21 @@ export default function StudentDashboard({ user }: StudentDashboardProps = {}) {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h4 className="font-medium text-foreground">{report.category}</h4>
-                        {report.anonymous && (
+                        <h4 className="font-medium text-foreground">{report.title || report.category}</h4>
+                        {report.isAnonymous && (
                           <Badge variant="outline" className="text-xs">Anonymous</Badge>
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span className="font-mono text-xs">{report.id}</span>
+                        <span className="font-mono text-xs">{report.referenceId || `#${report.id}`}</span>
                         <span>•</span>
                         <Clock className="h-3 w-3" />
-                        <span>{report.timestamp}</span>
+                        <span>{relativeTime(report.createdAt)}</span>
                       </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <StatusBadge status={report.status} />
+                    <StatusBadge status={toBadgeStatus(report.status)} />
                     <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
                       <Eye className="h-4 w-4" />
                     </Button>
@@ -298,7 +355,7 @@ export default function StudentDashboard({ user }: StudentDashboardProps = {}) {
               ))}
             </div>
 
-            {studentReports.length === 0 && (
+            {!loading && !loadError && reports.length === 0 && (
               <div className="text-center py-12">
                 <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center mx-auto mb-4">
                   <FileText className="h-8 w-8 text-muted-foreground" />

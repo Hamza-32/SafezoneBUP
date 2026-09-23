@@ -468,6 +468,40 @@ async function main(): Promise<void> {
   check('a cross-origin login is refused', crossOrigin.status === 403, `status ${crossOrigin.status}`);
 
   // -------------------------------------------------------------------------
+  // The listing endpoints.
+  //
+  // These are the screens a reporter and a responder actually read, and all
+  // three returned 500 on every call for as long as they have existed: they
+  // LEFT JOIN users ON <table>.assignedTo, and that column was in no schema
+  // revision until migration 003. Nothing here exercised them, so 39 checks
+  // passed against an application whose report lists could not load.
+  //
+  // A 200 is the assertion. A 500 means the join or the JSONB handling has
+  // regressed.
+  section('Report listings load');
+
+  const myReports = await call('GET', '/api/emergency/my-reports', { session: aliceSession });
+  check(
+    'a student can list their own emergency reports',
+    myReports.status === 200,
+    `status ${myReports.status}`
+  );
+
+  const myComplaints = await call('GET', '/api/complaint/reports', { session: aliceSession });
+  check(
+    'the complaints listing responds without a server error',
+    myComplaints.status === 200 || myComplaints.status === 403,
+    `status ${myComplaints.status}`
+  );
+
+  const staffReports = await call('GET', '/api/emergency/reports', { session: aliceSession });
+  check(
+    'the staff emergency listing refuses a student rather than failing',
+    staffReports.status === 403,
+    `status ${staffReports.status}`
+  );
+
+  // -------------------------------------------------------------------------
   section('Removed endpoints are gone');
 
   for (const path of ['/api/debug-env', '/api/resources', '/api/discussions']) {

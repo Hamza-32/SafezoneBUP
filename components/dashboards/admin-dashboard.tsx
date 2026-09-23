@@ -1,5 +1,5 @@
 "use client"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   Home,
   FileText,
@@ -35,67 +35,47 @@ import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
 import { Progress } from "@/components/ui/progress"
+import apiClient from "@/lib/api-client"
 
-// Sample reports data
-const reportsData = [
-  {
-    id: "RPT-001",
-    category: "Medical Emergency",
-    time: "10:30 AM",
-    date: "Today",
-    anonymous: true,
-    status: "In Progress",
-    location: "Library Building",
-    priority: "High",
-    reporter: "Anonymous",
-  },
-  {
-    id: "RPT-002",
-    category: "Security Issue",
-    time: "09:15 AM",
-    date: "Today",
-    anonymous: false,
-    status: "Resolved",
-    location: "Parking Lot A",
-    priority: "Medium",
-    reporter: "Rafiq Ahmed",
-  },
-  {
-    id: "RPT-003",
-    category: "Fire Alarm",
-    time: "08:45 AM",
-    date: "Today",
-    anonymous: false,
-    status: "Pending",
-    location: "Dormitory B",
-    priority: "High",
-    reporter: "Fatima Khan",
-  },
-  {
-    id: "RPT-004",
-    category: "Suspicious Activity",
-    time: "07:20 AM",
-    date: "Today",
-    anonymous: true,
-    status: "Resolved",
-    location: "Student Center",
-    priority: "Low",
-    reporter: "Anonymous",
-  },
-  {
-    id: "RPT-005",
-    category: "Infrastructure",
-    time: "11:45 PM",
-    date: "Yesterday",
-    anonymous: false,
-    status: "In Progress",
-    location: "Engineering Building",
-    priority: "Medium",
-    reporter: "Hassan Ali",
-  },
-]
+// Rows come from /api/admin/dashboard. This component previously rendered a
+// hardcoded `reportsData` array and never called an API at all, so a real
+// emergency report reached the database, notified responders — and then was
+// invisible on the one screen a responder actually opens.
+interface DashboardReport {
+  id: number
+  title: string
+  category: string
+  location: string | null
+  status: string
+  priority: string
+  createdAt: string
+  reporterName: string
+  studentId: string | null
+}
 
-// Navigation items
+interface DashboardStats {
+  users: { total: number; admins: number; pendingVerifications: number }
+  reports: {
+    emergencies: { total: number; pending: number; critical: number; recent: number }
+    complaints: { total: number; pending: number; recent: number }
+  }
+}
+
+/** "3m ago", "2h ago", "5d ago" — enough precision for a triage list. */
+function relativeTime(iso: string): string {
+  const then = new Date(iso).getTime()
+  if (Number.isNaN(then)) return "unknown"
+
+  const minutes = Math.floor((Date.now() - then) / 60000)
+  if (minutes < 1) return "just now"
+  if (minutes < 60) return `${minutes}m ago`
+
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+
+  return `${Math.floor(hours / 24)}d ago`
+}
+
 const navigationItems = [
   { title: "Dashboard", url: "#", icon: Home, isActive: true },
   { title: "All Reports", url: "#", icon: FileText },
@@ -147,6 +127,53 @@ interface AdminDashboardProps {
 export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [activeNav, setActiveNav] = useState("Dashboard")
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [reports, setReports] = useState<DashboardReport[]>([])
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  const criticalCount = stats?.reports.emergencies.critical ?? 0
+  const pendingEmergencies = stats?.reports.emergencies.pending ?? 0
+  const pendingComplaints = stats?.reports.complaints.pending ?? 0
+  const attentionTotal = criticalCount + pendingEmergencies + pendingComplaints
+
+  /** Share of the outstanding work this bucket represents, 0 when idle. */
+  const attentionShare = (count: number) =>
+    attentionTotal === 0 ? 0 : Math.round((count / attentionTotal) * 100)
+
+  useEffect(() => {
+    let cancelled = false
+
+    const load = async () => {
+      try {
+        const response = await apiClient.getAdminDashboard()
+        const data = (response as any).data ?? response
+
+        if (cancelled) return
+
+        setStats(data?.statistics ?? null)
+        setReports(data?.recentActivity?.emergencies ?? [])
+        setLoadError(null)
+      } catch (error: any) {
+        if (cancelled) return
+        // A responder staring at an empty table must be able to tell
+        // "nothing has happened" apart from "this screen is broken".
+        console.error("Failed to load dashboard:", error)
+        setLoadError(
+          error?.status === 403
+            ? "This account does not have responder access."
+            : "Could not load live data. Retry, or check the service status."
+        )
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   return (
     <div className="min-h-screen bg-background">
@@ -287,11 +314,13 @@ export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Reports Today</p>
-                    <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">12</p>
-                    <div className="flex items-center gap-1 mt-2 text-green-600 text-xs">
+                    <p className="text-sm text-muted-foreground">Emergencies (7 days)</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">
+                      {loading ? "—" : stats?.reports.emergencies.recent ?? 0}
+                    </p>
+                    <div className="flex items-center gap-1 mt-2 text-muted-foreground text-xs">
                       <TrendingUp className="h-3 w-3" />
-                      <span>+25% from yesterday</span>
+                      <span>{stats?.reports.emergencies.total ?? 0} all time</span>
                     </div>
                   </div>
                   <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center">
@@ -305,11 +334,13 @@ export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Resolved</p>
-                    <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">8</p>
-                    <div className="flex items-center gap-1 mt-2 text-green-600 text-xs">
+                    <p className="text-sm text-muted-foreground">Awaiting response</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">
+                      {loading ? "—" : stats?.reports.emergencies.pending ?? 0}
+                    </p>
+                    <div className="flex items-center gap-1 mt-2 text-muted-foreground text-xs">
                       <CheckCircle className="h-3 w-3" />
-                      <span>67% resolution rate</span>
+                      <span>{stats?.reports.emergencies.critical ?? 0} critical</span>
                     </div>
                   </div>
                   <div className="h-12 w-12 rounded-2xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
@@ -323,11 +354,13 @@ export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Avg Response</p>
-                    <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">4.2m</p>
-                    <div className="flex items-center gap-1 mt-2 text-green-600 text-xs">
+                    <p className="text-sm text-muted-foreground">Open complaints</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">
+                      {loading ? "—" : stats?.reports.complaints.pending ?? 0}
+                    </p>
+                    <div className="flex items-center gap-1 mt-2 text-muted-foreground text-xs">
                       <TrendingDown className="h-3 w-3" />
-                      <span>-30s improvement</span>
+                      <span>{stats?.reports.complaints.recent ?? 0} in last 7 days</span>
                     </div>
                   </div>
                   <div className="h-12 w-12 rounded-2xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
@@ -341,11 +374,13 @@ export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
               <CardContent className="p-4 sm:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Staff On Duty</p>
-                    <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">15</p>
-                    <div className="flex items-center gap-1 mt-2 text-accent text-xs">
+                    <p className="text-sm text-muted-foreground">Responders</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">
+                      {loading ? "—" : stats?.users.admins ?? 0}
+                    </p>
+                    <div className="flex items-center gap-1 mt-2 text-muted-foreground text-xs">
                       <Activity className="h-3 w-3" />
-                      <span>All stations covered</span>
+                      <span>{stats?.users.pendingVerifications ?? 0} awaiting verification</span>
                     </div>
                   </div>
                   <div className="h-12 w-12 rounded-2xl bg-accent/10 flex items-center justify-center">
@@ -367,26 +402,35 @@ export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
+                {/* Counts and bar widths were literals (3/2/5 at 30/20/50%).
+                    The bars are now proportions of the real total, so a full
+                    bar means "all of the outstanding work", not a fixed 50%. */}
                 <div className="p-3 rounded-lg border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-sm">High Priority</span>
-                    <span className="text-xl font-bold text-yellow-600">3</span>
+                    <span className="font-medium text-sm">Critical</span>
+                    <span className="text-xl font-bold text-yellow-600">
+                      {loading ? "—" : criticalCount}
+                    </span>
                   </div>
-                  <Progress value={30} className="h-1.5" />
+                  <Progress value={attentionShare(criticalCount)} className="h-1.5" />
                 </div>
                 <div className="p-3 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-sm">In Progress</span>
-                    <span className="text-xl font-bold text-blue-600">2</span>
+                    <span className="font-medium text-sm">Emergencies awaiting response</span>
+                    <span className="text-xl font-bold text-blue-600">
+                      {loading ? "—" : pendingEmergencies}
+                    </span>
                   </div>
-                  <Progress value={20} className="h-1.5" />
+                  <Progress value={attentionShare(pendingEmergencies)} className="h-1.5" />
                 </div>
                 <div className="p-3 rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-900/20">
                   <div className="flex items-center justify-between mb-2">
-                    <span className="font-medium text-sm">Pending Review</span>
-                    <span className="text-xl font-bold text-orange-600">5</span>
+                    <span className="font-medium text-sm">Complaints awaiting review</span>
+                    <span className="text-xl font-bold text-orange-600">
+                      {loading ? "—" : pendingComplaints}
+                    </span>
                   </div>
-                  <Progress value={50} className="h-1.5" />
+                  <Progress value={attentionShare(pendingComplaints)} className="h-1.5" />
                 </div>
                 <Button variant="outline" className="w-full mt-2">
                   View All Pending
@@ -399,41 +443,37 @@ export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
             <Card className="lg:col-span-2">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-base font-semibold">Performance Overview</CardTitle>
-                  <Select defaultValue="today">
-                    <SelectTrigger className="w-32 h-8">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="today">Today</SelectItem>
-                      <SelectItem value="week">This Week</SelectItem>
-                      <SelectItem value="month">This Month</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <CardTitle className="text-base font-semibold">At a glance</CardTitle>
                 </div>
               </CardHeader>
               <CardContent>
                 <div className="grid sm:grid-cols-3 gap-6">
                   <div className="text-center p-4 rounded-xl bg-muted/50">
-                    <div className="h-16 w-16 mx-auto mb-3 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-                      <span className="text-2xl font-bold text-green-600">98%</span>
+                    <div className="h-16 w-16 mx-auto mb-3 rounded-full bg-primary/10 flex items-center justify-center">
+                      <span className="text-2xl font-bold text-primary">
+                        {loading ? "—" : stats?.reports.emergencies.total ?? 0}
+                      </span>
                     </div>
-                    <p className="text-sm font-medium text-foreground">Response Rate</p>
-                    <p className="text-xs text-muted-foreground">Target: 95%</p>
+                    <p className="text-sm font-medium text-foreground">Emergency reports</p>
+                    <p className="text-xs text-muted-foreground">All time</p>
                   </div>
                   <div className="text-center p-4 rounded-xl bg-muted/50">
-                    <div className="h-16 w-16 mx-auto mb-3 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                      <span className="text-2xl font-bold text-blue-600">4.8</span>
+                    <div className="h-16 w-16 mx-auto mb-3 rounded-full bg-accent/10 flex items-center justify-center">
+                      <span className="text-2xl font-bold text-accent">
+                        {loading ? "—" : stats?.reports.complaints.total ?? 0}
+                      </span>
                     </div>
-                    <p className="text-sm font-medium text-foreground">Satisfaction</p>
-                    <p className="text-xs text-muted-foreground">Out of 5.0</p>
+                    <p className="text-sm font-medium text-foreground">Complaints</p>
+                    <p className="text-xs text-muted-foreground">All time</p>
                   </div>
                   <div className="text-center p-4 rounded-xl bg-muted/50">
-                    <div className="h-16 w-16 mx-auto mb-3 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-                      <span className="text-2xl font-bold text-purple-600">92%</span>
+                    <div className="h-16 w-16 mx-auto mb-3 rounded-full bg-muted flex items-center justify-center">
+                      <span className="text-2xl font-bold text-foreground">
+                        {loading ? "—" : stats?.users.total ?? 0}
+                      </span>
                     </div>
-                    <p className="text-sm font-medium text-foreground">Cases Closed</p>
-                    <p className="text-xs text-muted-foreground">This month</p>
+                    <p className="text-sm font-medium text-foreground">Registered students</p>
+                    <p className="text-xs text-muted-foreground">Excludes staff accounts</p>
                   </div>
                 </div>
               </CardContent>
@@ -482,23 +522,47 @@ export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
                     </tr>
                   </thead>
                   <tbody>
-                    {reportsData.map((report) => (
+                    {loading && (
+                      <tr>
+                        <td colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                          Loading reports…
+                        </td>
+                      </tr>
+                    )}
+
+                    {!loading && loadError && (
+                      <tr>
+                        <td colSpan={6} className="py-10 text-center text-sm text-primary">
+                          {loadError}
+                        </td>
+                      </tr>
+                    )}
+
+                    {!loading && !loadError && reports.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                          No reports yet.
+                        </td>
+                      </tr>
+                    )}
+
+                    {!loading && !loadError && reports.map((report) => (
                       <tr key={report.id} className="border-b border-border hover:bg-muted/50 transition-colors">
                         <td className="py-4 px-4">
                           <div>
-                            <p className="font-medium text-foreground">{report.category}</p>
+                            <p className="font-medium text-foreground">{report.title || report.category}</p>
                             <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                              <span className="font-mono">{report.id}</span>
+                              <span className="font-mono">#{report.id}</span>
                               <span>•</span>
                               <Calendar className="h-3 w-3" />
-                              <span>{report.time}, {report.date}</span>
+                              <span>{relativeTime(report.createdAt)}</span>
                             </div>
                           </div>
                         </td>
                         <td className="py-4 px-4">
                           <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                             <MapPin className="h-3.5 w-3.5" />
-                            {report.location}
+                            {report.location || "Not recorded"}
                           </div>
                         </td>
                         <td className="py-4 px-4">
@@ -507,10 +571,10 @@ export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
                               <User className="h-3.5 w-3.5 text-muted-foreground" />
                             </div>
                             <span className="text-sm">
-                              {report.anonymous ? (
+                              {report.reporterName === "Anonymous" ? (
                                 <Badge variant="outline" className="text-xs">Anonymous</Badge>
                               ) : (
-                                report.reporter
+                                report.reporterName
                               )}
                             </span>
                           </div>
@@ -553,23 +617,32 @@ export default function AdminDashboard({ user }: AdminDashboardProps = {}) {
 
               {/* Mobile Cards */}
               <div className="md:hidden space-y-3">
-                {reportsData.map((report) => (
+                {loading && (
+                  <p className="py-8 text-center text-sm text-muted-foreground">Loading reports…</p>
+                )}
+                {!loading && loadError && (
+                  <p className="py-8 text-center text-sm text-primary">{loadError}</p>
+                )}
+                {!loading && !loadError && reports.length === 0 && (
+                  <p className="py-8 text-center text-sm text-muted-foreground">No reports yet.</p>
+                )}
+                {!loading && !loadError && reports.map((report) => (
                   <div key={report.id} className="p-4 rounded-xl border border-border hover:bg-muted/50 transition-colors">
                     <div className="flex items-start justify-between mb-3">
                       <div>
-                        <h4 className="font-medium text-foreground">{report.category}</h4>
-                        <p className="text-xs text-muted-foreground font-mono">{report.id}</p>
+                        <h4 className="font-medium text-foreground">{report.title || report.category}</h4>
+                        <p className="text-xs text-muted-foreground font-mono">#{report.id}</p>
                       </div>
                       <StatusBadge status={report.status} />
                     </div>
                     <div className="space-y-2 text-sm text-muted-foreground">
                       <div className="flex items-center gap-2">
                         <MapPin className="h-3.5 w-3.5" />
-                        {report.location}
+                        {report.location || "Not recorded"}
                       </div>
                       <div className="flex items-center gap-2">
                         <Clock className="h-3.5 w-3.5" />
-                        {report.time}, {report.date}
+                        {relativeTime(report.createdAt)}
                       </div>
                     </div>
                     <div className="flex items-center justify-between mt-3 pt-3 border-t border-border">

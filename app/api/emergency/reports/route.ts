@@ -9,6 +9,26 @@ import {
   errorResponse
 } from '@/lib/api-middleware';
 
+/**
+ * Read a JSONB column.
+ *
+ * node-pg parses jsonb before the row reaches here, so the value is normally
+ * already an array or object. A string only appears on the MySQL-era code
+ * path that lib/database.ts still supports, so both are tolerated, and a
+ * malformed value yields null rather than a 500.
+ */
+function readJsonColumn(value: unknown): unknown {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') return value;
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+
 export async function GET(request: NextRequest) {
   return withAdmin(request, async (req: NextRequest, user: any) => {
     try {
@@ -68,7 +88,7 @@ export async function GET(request: NextRequest) {
       // Process reports
       const processedReports = reports.map(report => ({
         ...report,
-        attachments: report.attachments ? JSON.parse(report.attachments) : null,
+        attachments: readJsonColumn(report.attachments),
         reporterName: report.firstName && report.lastName 
           ? `${report.firstName} ${report.lastName}` 
           : 'Anonymous',
