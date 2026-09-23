@@ -226,7 +226,7 @@ Measured against the live deployment, same endpoint, before and after:
 | | iad1 (Washington) | sin1 (Singapore) |
 | --- | --- | --- |
 | Cold `SELECT 1` | 1644ms | 60ms |
-| Warm `SELECT 1` | 223ms | — |
+| Warm `SELECT 1` | 223ms | 2ms |
 
 The database answers that query in well under a millisecond, so almost all of
 what was being measured was distance.
