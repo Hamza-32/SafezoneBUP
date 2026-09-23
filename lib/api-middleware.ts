@@ -104,8 +104,13 @@ export interface AuthenticatedUser {
 // Tokens
 // ---------------------------------------------------------------------------
 
-export function generateToken(userId: number): string {
-  return jwt.sign({ userId }, resolveJwtSecret(), { expiresIn: JWT_EXPIRES_IN });
+export function generateToken(userId: number, tokenVersion: number = 0): string {
+  // tv travels in the token and is compared against users.tokenVersion on
+  // every request. Bumping the column invalidates every token issued before
+  // it, which is what makes a password change end other sessions.
+  return jwt.sign({ userId, tv: tokenVersion }, resolveJwtSecret(), {
+    expiresIn: JWT_EXPIRES_IN,
+  });
 }
 
 /**
@@ -116,14 +121,17 @@ export function generateToken(userId: number): string {
  * next request instead of when the token finally expires.
  */
 export async function verifyToken(token: string): Promise<AuthenticatedUser> {
-  const decoded = jwt.verify(token, resolveJwtSecret()) as { userId?: unknown };
+  const decoded = jwt.verify(token, resolveJwtSecret()) as {
+    userId?: unknown;
+    tv?: unknown;
+  };
 
   if (typeof decoded.userId !== 'number') {
     throw new Error('Invalid token payload');
   }
 
   const users = await Database.query(
-    'SELECT id, email, firstName, lastName, studentId, phoneNumber, role, isVerified FROM users WHERE id = ?',
+    'SELECT id, email, firstName, lastName, studentId, phoneNumber, role, isVerified, tokenVersion FROM users WHERE id = ?',
     [decoded.userId]
   );
 
@@ -131,7 +139,18 @@ export async function verifyToken(token: string): Promise<AuthenticatedUser> {
     throw new Error('User not found');
   }
 
-  return users[0] as AuthenticatedUser;
+  const { tokenVersion, ...user } = users[0];
+
+  // A token minted before the current version was issued under a password
+  // the account no longer uses. Absent tv is treated as 0, so sessions
+  // predating this change keep working until they expire on their own.
+  const presented = typeof decoded.tv === 'number' ? decoded.tv : 0;
+
+  if (presented !== (tokenVersion ?? 0)) {
+    throw new Error('Session has been revoked');
+  }
+
+  return user as AuthenticatedUser;
 }
 
 /**

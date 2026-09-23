@@ -77,6 +77,8 @@ export const createTables = async () => {
         role TEXT NOT NULL DEFAULT 'student'
           CHECK (role IN ('student', 'admin', 'security')),
         isVerified BOOLEAN DEFAULT FALSE,
+        -- Bumped to revoke every session issued before a password change.
+        tokenVersion INTEGER NOT NULL DEFAULT 0,
         profileImage VARCHAR(255),
         createdAt TIMESTAMPTZ DEFAULT NOW(),
         updatedAt TIMESTAMPTZ DEFAULT NOW()

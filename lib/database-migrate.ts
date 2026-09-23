@@ -299,6 +299,34 @@ const migrations: Migration[] = [
       }
     },
   },
+  {
+    id: '004-add-token-version',
+    description: 'Add users.tokenVersion so a password change can revoke issued sessions',
+    up: async () => {
+      // A session is a seven-day JWT and nothing recorded which ones were
+      // still meant to work. Changing a password issued a new token and left
+      // every previously issued one valid, so the standard response to "my
+      // account is compromised" did not actually end the intruder's access.
+      //
+      // A counter in the token, compared against the row on every request,
+      // revokes them all at once. verifyToken already re-reads the user, so
+      // this costs one more column in a query that was happening anyway.
+      if (!(await tableExists('users'))) {
+        console.log('   skipped users (table does not exist yet)');
+        return;
+      }
+
+      if (await columnExists('users', 'tokenVersion')) {
+        console.log('   users.tokenVersion already present');
+        return;
+      }
+
+      await Database.query(
+        'ALTER TABLE users ADD COLUMN tokenVersion INTEGER NOT NULL DEFAULT 0'
+      );
+      console.log('   users.tokenVersion added');
+    },
+  },
 ];
 
 /** Where the connection settings currently point. */

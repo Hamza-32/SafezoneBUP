@@ -54,20 +54,23 @@ export async function PUT(request: NextRequest) {
 
     const hashedNewPassword = await hashPassword(newPassword);
 
-    await Database.query(
-      'UPDATE users SET password = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?',
+    // Bumping tokenVersion in the same statement revokes every session
+    // issued under the old password. Returning it means the replacement
+    // token below is minted at the new version rather than the old one.
+    const [updated] = await Database.query(
+      `UPDATE users
+          SET password = ?, tokenVersion = tokenVersion + 1, updatedAt = CURRENT_TIMESTAMP
+        WHERE id = ?
+        RETURNING tokenVersion`,
       [hashedNewPassword, auth.user.id]
     );
 
     await logAction(auth.user.id, 'CHANGE_PASSWORD', 'users', auth.user.id, {}, request);
 
-    // Issue a fresh session so the person changing their password keeps
-    // working without re-authenticating.
-    //
-    // Note: tokens issued earlier remain valid until they expire, because
-    // nothing tracks them. Invalidating other sessions on a password change
-    // needs either a token version column on users or a session table.
-    const token = generateToken(auth.user.id);
+    // A fresh session so the person changing their password keeps working,
+    // while every other device holding the old token is signed out — which
+    // is the point of changing it after a compromise.
+    const token = generateToken(auth.user.id, updated?.tokenVersion ?? 0);
     const response = successResponse({ token }, 'Password changed successfully');
 
     return setAuthCookie(response, token);

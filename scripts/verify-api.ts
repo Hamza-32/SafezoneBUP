@@ -615,6 +615,53 @@ async function main(): Promise<void> {
   }
 
   // -------------------------------------------------------------------------
+  // Changing a password has to end other sessions.
+  //
+  // A session is a seven-day JWT. Nothing tracked which were still meant to
+  // work, so changing a password minted a new token and left every earlier
+  // one valid — the standard response to a compromised account did not end
+  // the intruder's access. users.tokenVersion is carried in the token and
+  // compared on every request.
+  section('A password change revokes other sessions');
+
+  const victim = newAccount('victim');
+  await call('POST', '/api/auth/register', { body: victim });
+
+  const firstLogin = await call('POST', '/api/auth/login', {
+    body: { email: victim.email, password: victim.password },
+  });
+  const stolen: Session = { cookie: firstLogin.setCookie };
+
+  const secondLogin = await call('POST', '/api/auth/login', {
+    body: { email: victim.email, password: victim.password },
+  });
+  const owner: Session = { cookie: secondLogin.setCookie };
+
+  const beforeChange = await call('GET', '/api/auth/me', { session: stolen });
+  check('the older session works before the change', beforeChange.status === 200, `status ${beforeChange.status}`);
+
+  const changed = await call('PUT', '/api/auth/change-password', {
+    session: owner,
+    body: { currentPassword: victim.password, newPassword: 'RotatedPass9x' },
+  });
+  check('the password change succeeds', changed.status === 200, `status ${changed.status}`);
+
+  const afterChange = await call('GET', '/api/auth/me', { session: stolen });
+  check(
+    'the older session is refused after the change',
+    afterChange.status === 401,
+    `status ${afterChange.status}`
+  );
+
+  const replacement: Session = { cookie: changed.setCookie };
+  const stillOwner = await call('GET', '/api/auth/me', { session: replacement });
+  check(
+    'the session returned by the change still works',
+    stillOwner.status === 200,
+    `status ${stillOwner.status}`
+  );
+
+  // -------------------------------------------------------------------------
   section('Removed endpoints are gone');
 
   for (const path of ['/api/debug-env', '/api/resources', '/api/discussions']) {

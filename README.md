@@ -112,7 +112,7 @@ Deployed on Vercel. Every third-party service is on a free tier.
 | --- | --- |
 | **61** unit tests | Vitest. No database, no network. |
 | **70** security invariants | Role escalation, record ownership, URL handling, rate-limit configuration, endpoint authentication. |
-| **52** end-to-end checks | Against a real database. Creates throwaway accounts and removes them. |
+| **56** end-to-end checks | Against a real database. Creates throwaway accounts and removes them. |
 | **0** accessibility violations | axe-core, WCAG 2.1 A and AA, across all ten pages. |
 
 ```bash
@@ -139,6 +139,8 @@ disagreement.
 - Session in an httpOnly, `SameSite=Lax`, secure cookie; the user record is
   re-read on every request, so a role change or deletion takes effect at once
   rather than when the token expires
+- Changing a password revokes every session issued under the old one, via a
+  token version compared on each request
 - Every query parameterised; no helper interpolates request data into SQL
 - Rate limiting on every user-facing write, keyed per account where the
   endpoint is anonymous to other readers

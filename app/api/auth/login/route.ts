@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     if (accountLimited) return accountLimited;
 
     const users = await Database.query(
-      'SELECT id, firstName, lastName, email, password, role, studentId, phoneNumber, isVerified FROM users WHERE email = ?',
+      'SELECT id, firstName, lastName, email, password, role, studentId, phoneNumber, isVerified, tokenVersion FROM users WHERE email = ?',
       [email]
     );
 
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
 
     delete user.password;
 
-    const token = generateToken(user.id);
+    const token = generateToken(user.id, user.tokenVersion ?? 0);
 
     await logAction(user.id, 'LOGIN', 'users', user.id, { role: user.role }, request);
 
