@@ -119,8 +119,12 @@ Verified reporters carry more weight with responders.
 ## For responders and administrators
 
 Staff accounts see the admin dashboard: every emergency report and complaint,
-with ownership and status. Take ownership of a report so other responders can
-see it is being handled.
+with its category, location, reporter and status, newest first.
+
+Acting on a report from that screen is **not yet implemented**. The View,
+Edit, Assign Staff, Mark as Resolved and Add Note controls are present but do
+nothing when clicked. Until they are wired up, coordinate outside the
+platform and treat the dashboard as a read-only view of what has come in.
 
 Notifications appear in the dashboard, and are emailed if the deployment has
 alert delivery configured. Check with whoever administers the deployment

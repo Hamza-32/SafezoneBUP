@@ -28,7 +28,9 @@ notified immediately, by email as well as in the app.
 | **Safety resources** | Verified emergency numbers and campus guidance. |
 
 Two dashboards sit behind it: students see their own reports, staff see
-everything with ownership and status.
+every report with its status. Acting on a report from the dashboard —
+assigning it, resolving it, adding a note — is not wired up yet; the
+controls are present but inert.
 
 <details>
 <summary>More screenshots</summary>
@@ -110,7 +112,7 @@ Deployed on Vercel. Every third-party service is on a free tier.
 | --- | --- |
 | **47** unit tests | Vitest. No database, no network. |
 | **70** security invariants | Role escalation, record ownership, URL handling, rate-limit configuration, endpoint authentication. |
-| **39** end-to-end checks | Against a real database. Creates throwaway accounts and removes them. |
+| **42** end-to-end checks | Against a real database. Creates throwaway accounts and removes them. |
 | **0** accessibility violations | axe-core, WCAG 2.1 A and AA, across all ten pages. |
 
 ```bash
@@ -167,7 +169,7 @@ check-in escalation, alert delivery and error reporting.
 
 ```
 app/
-  api/            24 route handlers
+  api/            25 route handlers
   error.tsx       error boundaries, which carry the emergency number
 components/
   ui/             shadcn primitives
