@@ -110,9 +110,9 @@ Deployed on Vercel. Every third-party service is on a free tier.
 
 | | |
 | --- | --- |
-| **53** unit tests | Vitest. No database, no network. |
+| **61** unit tests | Vitest. No database, no network. |
 | **70** security invariants | Role escalation, record ownership, URL handling, rate-limit configuration, endpoint authentication. |
-| **47** end-to-end checks | Against a real database. Creates throwaway accounts and removes them. |
+| **44** end-to-end checks | Against a real database. Creates throwaway accounts and removes them. |
 | **0** accessibility violations | axe-core, WCAG 2.1 A and AA, across all ten pages. |
 
 ```bash
