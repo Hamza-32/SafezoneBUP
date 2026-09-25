@@ -32,19 +32,57 @@ every report with its status, can take ownership of one and move it through
 investigating and resolved.
 
 <details>
-<summary>More screenshots</summary>
+<summary>More screenshots — dashboard, dark mode, mobile and the rest</summary>
 
-**Dark mode**
+### Responder dashboard
 
-![Dark mode](docs/screenshots/home-dark.png)
+Real reports, newest first, with priority and status. A responder can take
+ownership of one and move it through investigating and resolved.
 
-**Emergency report**
+![Responder dashboard](docs/screenshots/admin-dashboard.png)
+
+### Emergency report
+
+No account required. Optional GPS, an anonymity switch, and a reference code
+returned on submission.
 
 ![Emergency reporting](docs/screenshots/emergency.png)
 
-**Lost and found**
+### Safety check-in
+
+Say where you are going and when you expect to arrive. If you never confirm,
+responders are told automatically fifteen minutes later.
+
+![Safety check-in](docs/screenshots/check-in.png)
+
+### Lost and found
+
+Public to search, but contact details are released only to signed-in users,
+so the board cannot be harvested for phone numbers.
 
 ![Lost and found](docs/screenshots/lost-and-found.png)
+
+### Safety resources
+
+Only numbers that can be checked against a published source.
+
+![Safety resources](docs/screenshots/safety-resources.png)
+
+### Dark mode
+
+One `--radius` token and a set of CSS variables drive both themes.
+
+![Dark mode](docs/screenshots/home-dark.png)
+
+### On a phone
+
+The emergency form is the case that matters: one-handed, under stress.
+
+<p>
+  <img src="docs/screenshots/mobile-home.png" alt="Home on a phone" width="300" />
+  &nbsp;
+  <img src="docs/screenshots/mobile-emergency.png" alt="Emergency form on a phone" width="300" />
+</p>
 
 </details>
 
@@ -210,6 +248,38 @@ Known gaps, all documented rather than hidden:
 
 ---
 
+## What would come next
+
+Paused here deliberately: the software is no longer the thing standing
+between this and real use. What remains is organisational.
+
+**To pilot it with real students**
+
+1. Agreement from the university, and their actual security and medical
+   extension numbers — the ones deliberately left out rather than invented.
+2. A verified sending domain, so alerts can reach staff addresses. The free
+   test sender only delivers to the account owner.
+3. Real responder accounts and a rota, so someone is accountable for acting
+   on an alert rather than merely receiving it.
+
+**Engineering, in rough priority**
+
+- SMS alongside email. Email is what a free tier allows; a phone call or text
+  is what wakes someone at 3am.
+- Acting on a report from the dashboard beyond triage: notes, attachments, a
+  full audit trail visible in the interface.
+- A nonce-issuing middleware so `script-src` can drop `'unsafe-inline'`.
+- Push notifications, so a responder does not need an inbox open.
+
+---
+
 ## Licence
 
-MIT. See [LICENSE](LICENSE).
+**All rights reserved.** This code is published so it can be read and
+evaluated, not reused. See [LICENSE](LICENSE).
+
+You are welcome to read it, and to reference it when assessing my work. You
+may not copy it, build on it, or run it as a service without permission.
+
+SafezoneBUP is an independent student project, not affiliated with or
+endorsed by Bangladesh University of Professionals.

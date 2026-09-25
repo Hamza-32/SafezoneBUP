@@ -1,21 +1,38 @@
-MIT License
+Copyright (c) 2026 Hamza-32 (https://github.com/Hamza-32)
 
-Copyright (c) 2024-2026 SafezoneBUP Contributors
+All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+This source code is published for the purpose of demonstrating the author's
+work. It is NOT open source, and no licence to use it is granted.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+YOU MAY:
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+  - View and read this source code.
+  - Reference it when evaluating the author, for example as part of a job
+    application, academic assessment, or portfolio review.
+  - Quote short excerpts with attribution, as in a review or discussion.
+
+YOU MAY NOT, without the author's prior written permission:
+
+  - Copy, reproduce, or redistribute this code in whole or in substantial
+    part.
+  - Modify it or create derivative works from it.
+  - Use it, or any substantial part of it, in any other project, whether
+    personal, academic, or commercial.
+  - Deploy or operate it as a service.
+  - Sell, sublicense, or otherwise transfer any rights in it.
+
+Publishing source code does not place it in the public domain. Absent an
+explicit licence, copyright is retained in full by the author.
+
+For permission to use this work, contact the author through
+https://github.com/Hamza-32.
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+AUTHOR BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR ITS USE.
+
+SafezoneBUP is an independent student project. It is not affiliated with,
+endorsed by, or operated by Bangladesh University of Professionals.
